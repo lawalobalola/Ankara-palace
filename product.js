@@ -420,6 +420,14 @@
 
     document.title = `${product.name} — Ankara Palace`;
     render();
+    const refreshProduct = (key) => {
+      if (key !== AP.KEYS.products && key !== AP.KEYS.categories) return;
+      product = AP.Collections.products.byId(id);
+      category = product ? AP.Collections.categories.byId(product.categoryId) : null;
+      render();
+    };
+    window.addEventListener("ap:data-change", (event) => refreshProduct(event.detail?.key));
+    window.addEventListener("storage", (event) => refreshProduct(event.key));
   }
 
   if (document.readyState === "loading") {

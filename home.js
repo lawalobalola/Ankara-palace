@@ -27,6 +27,17 @@
       `;
       mount.appendChild(card);
     });
+
+    const links = $("#home-category-links");
+    if (links) {
+      clear(links);
+      AP.Collections.categories.all().forEach((cat) => {
+        const link = document.createElement("a");
+        link.href = `shop.html?category=${encodeURIComponent(cat.id)}`;
+        link.textContent = cat.name;
+        links.appendChild(link);
+      });
+    }
   }
 
   function renderNewArrivals() {
@@ -35,18 +46,9 @@
     clear(mount);
 
     const products = AP.Collections.products.active()
-      .filter((p) => p.newArrival)
+      .slice()
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
       .slice(0, 4);
-
-    if (products.length === 0) {
-      AP.Collections.products.active()
-        .slice()
-        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        .slice(0, 4)
-        .forEach((p) => mount.appendChild(productCard(p)));
-      return;
-    }
-
     products.forEach((p) => mount.appendChild(productCard(p)));
   }
 
@@ -55,13 +57,14 @@
     if (!mount) return;
     clear(mount);
 
-    const products = AP.Collections.products.active()
+    const allProducts = AP.Collections.products.active()
+      .slice()
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    const products = allProducts
       .filter((p) => p.bestseller)
       .slice(0, 4);
 
-    const list = products.length > 0
-      ? products
-      : AP.Collections.products.active().slice(0, 4);
+    const list = [...products, ...allProducts.filter((p) => !products.some((featured) => featured.id === p.id))].slice(0, 4);
 
     list.forEach((p) => mount.appendChild(productCard(p)));
   }
@@ -136,6 +139,24 @@
     updateHeroStats();
     updateHeroImage();
     animateHeroHeadline();
+    const searchForm = $("#home-search");
+    if (searchForm) searchForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const query = $("#home-search-input")?.value.trim() || "";
+      location.href = query ? `shop.html?q=${encodeURIComponent(query)}` : "shop.html";
+    });
+    const refresh = () => {
+      renderCollections();
+      renderNewArrivals();
+      renderBestsellers();
+      updateHeroStats();
+      updateHeroImage();
+    };
+    const refreshIfCatalogueChanged = (key) => {
+      if (key === AP.KEYS.products || key === AP.KEYS.categories || key === AP.KEYS.settings) refresh();
+    };
+    window.addEventListener("ap:data-change", (event) => refreshIfCatalogueChanged(event.detail?.key));
+    window.addEventListener("storage", (event) => refreshIfCatalogueChanged(event.key));
   }
 
   if (document.readyState === "loading") {

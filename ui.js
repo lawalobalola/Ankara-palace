@@ -106,9 +106,18 @@
       btn.type = "button";
       btn.className = `btn ${action.className || "btn--ghost"}`;
       btn.textContent = action.label;
-      btn.addEventListener("click", () => {
-        if (action.onClick) action.onClick();
-        if (action.close !== false) closeModal();
+      btn.addEventListener("click", async () => {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        try {
+          const result = action.onClick ? await action.onClick() : undefined;
+          if (action.close !== false && result !== false) closeModal();
+        } catch (error) {
+          console.error("[AP.UI] Modal action failed", error);
+          toastError(error && error.message ? error.message : "That action could not be completed.");
+        } finally {
+          if (backdrop.isConnected) btn.disabled = false;
+        }
       });
       actionRow.appendChild(btn);
     });

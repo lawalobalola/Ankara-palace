@@ -252,6 +252,15 @@
     renderFilterOptions();
     bind();
     render();
+    const refresh = (key) => {
+      if (key === AP.KEYS.products || key === AP.KEYS.categories) {
+        renderFilterOptions();
+        state.page = 1;
+        render();
+      }
+    };
+    window.addEventListener("ap:data-change", (event) => refresh(event.detail?.key));
+    window.addEventListener("storage", (event) => refresh(event.key));
   }
 
   if (document.readyState === "loading") {

@@ -280,13 +280,19 @@
         row.querySelector('[data-action="delete"]').addEventListener("click", async () => {
           const ok = await confirmDialog({ title: "Delete Fabric", message: "This will remove the fabric from the catalogue. Existing orders will still keep their records.", confirmLabel: "Delete", danger: true });
           if (!ok) return;
-          AP.Collections.products.remove(id);
+          if (!AP.Collections.products.remove(id)) {
+            toastError("The fabric could not be removed from browser storage.");
+            return;
+          }
           toastSuccess("Fabric deleted.");
           renderSection();
         });
         row.querySelector('[data-action="toggle-active"]').addEventListener("click", () => {
           const p = AP.Collections.products.byId(id);
-          AP.Collections.products.update(id, { active: p.active === false });
+          if (!AP.Collections.products.update(id, { active: p.active === false })) {
+            toastError("The catalogue could not be updated. Browser storage may be full.");
+            return;
+          }
           toastSuccess(p.active === false ? "Fabric published." : "Fabric archived.");
           renderSection();
         });
@@ -362,7 +368,7 @@
                 <i class="fa-solid fa-image"></i> Choose Image
               </label>
               <input type="file" id="product-image-input" accept="image/png,image/jpeg,image/webp" hidden />
-              <small class="color-muted">JPG, PNG or WEBP · Max 2 MB</small>
+              <small class="color-muted">JPG, PNG or WEBP · Max 2 MB. Images are compressed for browser storage.</small>
             </div>
           </div>
         </div>
@@ -394,12 +400,12 @@
             const name = (data.name || "").trim();
             const desc = (data.description || "").trim();
             const price = Number(data.pricePerYard);
-            if (!name) { toastError("Fabric name is required."); return; }
-            if (!desc) { toastError("Description is required."); return; }
-            if (!price || price <= 0) { toastError("Price per yard must be greater than zero."); return; }
+            if (!name) { toastError("Fabric name is required."); return false; }
+            if (!desc) { toastError("Description is required."); return false; }
+            if (!price || price <= 0) { toastError("Price per yard must be greater than zero."); return false; }
             const bundleYards = Number(data.bundleYards) || 0;
             const bundlePrice = Number(data.bundlePrice) || 0;
-            if ((bundleYards > 0) !== (bundlePrice > 0)) { toastError("Enter both yards per bundle and its price, or leave both blank."); return; }
+            if ((bundleYards > 0) !== (bundlePrice > 0)) { toastError("Enter both yards per bundle and its price, or leave both blank."); return false; }
 
             let imageToUse = existingImage;
             if (pendingImageDataUrl) imageToUse = pendingImageDataUrl;
@@ -424,15 +430,17 @@
               images: [imageToUse]
             };
 
-            if (editing) {
-              AP.Collections.products.update(id, payload);
-              toastSuccess("Fabric updated.");
-            } else {
-              AP.Collections.products.add({ id: AP.uid("prod-"), ...payload, tags: [], createdAt: AP.nowISO() });
-              toastSuccess("Fabric created.");
+            const saved = editing
+              ? AP.Collections.products.update(id, payload)
+              : AP.Collections.products.add({ id: AP.uid("prod-"), ...payload, tags: [], createdAt: AP.nowISO() });
+            if (!saved) {
+              toastError("The fabric could not be saved. Browser storage may be full; try a smaller image or clear old demo data.");
+              return false;
             }
+            toastSuccess(editing ? "Fabric updated and published to the catalogue." : "Fabric created and published to the catalogue.");
             closeModal();
             renderSection();
+            return true;
           }
         }
       ]
@@ -447,10 +455,10 @@
       const check = AP.Uploads.validate(file, AP.Uploads.ALLOWED_IMAGES);
       if (!check.ok) { toastError(check.error); input.value = ""; return; }
       try {
-        const dataUrl = await AP.Uploads.fileToDataURL(file);
+        const dataUrl = await AP.Uploads.optimizeImage(file);
         pendingImageDataUrl = dataUrl;
         preview.src = dataUrl;
-        toastSuccess("Image ready. Save to apply.");
+        toastSuccess("Optimized image ready. Save to publish the fabric.");
       } catch (err) {
         toastError(err.message || "Could not read the image.");
       } finally {
@@ -1046,7 +1054,7 @@
       const check = AP.Uploads.validate(file, AP.Uploads.ALLOWED_IMAGES);
       if (!check.ok) { toastError(check.error); imageInput.value = ""; return; }
       try {
-        heroImage = await AP.Uploads.fileToDataURL(file);
+        heroImage = await AP.Uploads.optimizeImage(file);
         card.querySelector("#hero-image-preview").src = heroImage;
       } catch (_) { toastError("Could not read that image. Please try another file."); }
     });
@@ -1054,7 +1062,10 @@
       e.preventDefault();
       const data = Object.fromEntries(new FormData(e.target).entries());
       data.heroImage = heroImage;
-      AP.Collections.settings.save(data);
+      if (!AP.Collections.settings.save(data)) {
+        toastError("The content could not be saved. Browser storage may be full.");
+        return;
+      }
       toastSuccess("Content updated. The homepage image will use this photo in this browser demo.");
     });
   }
@@ -1087,7 +1098,10 @@
       const data = Object.fromEntries(new FormData(e.target).entries());
       data.deliveryFee = Number(data.deliveryFee) || 0;
       data.freeDeliveryThreshold = Number(data.freeDeliveryThreshold) || 0;
-      AP.Collections.settings.save(data);
+      if (!AP.Collections.settings.save(data)) {
+        toastError("Settings could not be saved. Browser storage may be full.");
+        return;
+      }
       AP.Collections.logs.add({ action: "settings_update", email: getSession()?.email });
       toastSuccess("Settings saved.");
     });

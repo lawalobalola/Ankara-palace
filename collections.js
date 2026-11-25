@@ -27,6 +27,8 @@
     categories.forEach((cat) => {
       const products = AP.Collections.products.active()
         .filter((p) => p.categoryId === cat.id)
+        .slice()
+        .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
         .slice(0, 3);
 
       const row = document.createElement("div");
@@ -58,8 +60,20 @@
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", render);
+    document.addEventListener("DOMContentLoaded", () => {
+      render();
+      listenForCatalogueUpdates();
+    });
   } else {
     render();
+    listenForCatalogueUpdates();
+  }
+
+  function listenForCatalogueUpdates() {
+    const refresh = (key) => {
+      if (key === AP.KEYS.products || key === AP.KEYS.categories) render();
+    };
+    window.addEventListener("ap:data-change", (event) => refresh(event.detail?.key));
+    window.addEventListener("storage", (event) => refresh(event.key));
   }
 })();

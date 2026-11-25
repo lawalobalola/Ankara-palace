@@ -52,6 +52,7 @@
     set(key, value) {
       try {
         localStorage.setItem(key, JSON.stringify(value));
+        try { window.dispatchEvent(new CustomEvent("ap:data-change", { detail: { key } })); } catch (_) {}
         return true;
       } catch (err) {
         console.error("[AP.Db] Unable to persist", key, err);
@@ -246,16 +247,22 @@
       active: () => Collections.products.all().filter((p) => p.active !== false),
       byId: (id) => Collections.products.all().find((p) => p.id === id) || null,
       save: (list) => storage.set(KEYS.products, list),
-      add: (product) => { const list = Collections.products.all(); list.push(product); Collections.products.save(list); return product; },
+      add: (product) => {
+        const list = Collections.products.all();
+        list.push(product);
+        return Collections.products.save(list) ? product : null;
+      },
       update: (id, patch) => {
         const list = Collections.products.all();
         const idx = list.findIndex((p) => p.id === id);
         if (idx === -1) return null;
         list[idx] = { ...list[idx], ...patch };
-        Collections.products.save(list);
-        return list[idx];
+        return Collections.products.save(list) ? list[idx] : null;
       },
-      remove: (id) => { const list = Collections.products.all().filter((p) => p.id !== id); Collections.products.save(list); }
+      remove: (id) => {
+        const list = Collections.products.all().filter((p) => p.id !== id);
+        return Collections.products.save(list);
+      }
     },
     categories: {
       all: () => storage.get(KEYS.categories, []),
@@ -341,7 +348,10 @@
     },
     settings: {
       get: () => storage.get(KEYS.settings, {}),
-      save: (patch) => { const s = { ...Collections.settings.get(), ...patch }; storage.set(KEYS.settings, s); return s; }
+      save: (patch) => {
+        const s = { ...Collections.settings.get(), ...patch };
+        return storage.set(KEYS.settings, s) ? s : null;
+      }
     }
   };
 
@@ -517,6 +527,36 @@
         reader.onload = () => resolve(String(reader.result || ""));
         reader.readAsDataURL(file);
       });
+    },
+    optimizeImage(file, maxChars = 260000) {
+      return Uploads.fileToDataURL(file).then((source) => new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onerror = () => reject(new Error("Could not open the selected image."));
+        image.onload = () => {
+          let scale = Math.min(1, 1200 / Math.max(image.naturalWidth, image.naturalHeight));
+          let result = "";
+          try {
+            for (let attempt = 0; attempt < 12; attempt += 1) {
+              const canvas = document.createElement("canvas");
+              canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+              canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+              const context = canvas.getContext("2d", { alpha: false });
+              if (!context) throw new Error("Image editing is not supported in this browser.");
+              context.fillStyle = "#ffffff";
+              context.fillRect(0, 0, canvas.width, canvas.height);
+              context.drawImage(image, 0, 0, canvas.width, canvas.height);
+              const quality = Math.max(0.48, 0.84 - attempt * 0.045);
+              result = canvas.toDataURL("image/jpeg", quality);
+              if (result.length <= maxChars) { resolve(result); return; }
+              scale *= 0.86;
+            }
+            reject(new Error("This image is still too large after compression. Choose a smaller photo."));
+          } catch (error) {
+            reject(error);
+          }
+        };
+        image.src = source;
+      }));
     }
   };
 
