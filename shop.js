@@ -130,6 +130,7 @@
     grid.classList.remove("ap-empty-hidden");
 
     const filtered = getFiltered();
+    updateFilterCount();
     const total = filtered.length;
     const shown = filtered.slice(0, state.page * state.pageSize);
 
@@ -150,8 +151,31 @@
     }
 
     if (countEl) countEl.innerHTML = `Showing <strong>${shown.length}</strong> of <strong>${total}</strong> fabric${total === 1 ? "" : "s"}`;
-    shown.forEach((p) => grid.appendChild(productCard(p, { showWishlist: true })));
+    shown.forEach((p) => grid.appendChild(productCard(p, { showWishlist: true, quickAdd: true })));
     if (loadWrap) loadWrap.hidden = shown.length >= total;
+  }
+
+  function updateFilterCount() {
+    const count = state.categories.size + state.colours.size +
+      Number(state.priceMin != null) + Number(state.priceMax != null) + Number(state.inStockOnly);
+    const badge = $("#filters-count");
+    if (!badge) return;
+    badge.textContent = String(count);
+    badge.hidden = count === 0;
+  }
+
+  function setFilterDrawer(open) {
+    const panel = $("#filters");
+    const toggle = $("#filters-toggle");
+    if (!panel || !toggle) return;
+    const useDrawer = window.matchMedia("(max-width: 760px)").matches;
+    panel.classList.toggle("is-open", open);
+    document.body.classList.toggle("is-filter-open", open && useDrawer);
+    panel.setAttribute("role", useDrawer && open ? "dialog" : "complementary");
+    panel.setAttribute("aria-modal", String(Boolean(useDrawer && open)));
+    toggle.setAttribute("aria-expanded", String(open));
+    if (open && useDrawer) $("#filters-title")?.focus();
+    if (!open) toggle.focus();
   }
 
   function resetFilters() {
@@ -202,9 +226,25 @@
     if (fToggle) fToggle.addEventListener("click", () => {
       const panel = $("#filters");
       if (!panel) return;
-      const open = panel.classList.toggle("is-open");
-      fToggle.setAttribute("aria-expanded", String(open));
+      setFilterDrawer(!panel.classList.contains("is-open"));
     });
+    const done = $("#filters-done");
+    if (done) done.addEventListener("click", () => setFilterDrawer(false));
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && $("#filters")?.classList.contains("is-open")) setFilterDrawer(false);
+    });
+    document.addEventListener("click", (event) => {
+      if (!document.body.classList.contains("is-filter-open")) return;
+      if (event.target === document.body || event.target.classList?.contains("filter-backdrop")) setFilterDrawer(false);
+    });
+    window.addEventListener("resize", () => {
+      const panel = $("#filters");
+      const isOpen = Boolean(panel?.classList.contains("is-open"));
+      const isMobile = window.matchMedia("(max-width: 760px)").matches;
+      document.body.classList.toggle("is-filter-open", isOpen && isMobile);
+      panel?.setAttribute("aria-modal", String(Boolean(isOpen && isMobile)));
+      panel?.setAttribute("role", isOpen && isMobile ? "dialog" : "complementary");
+    }, { passive: true });
   }
 
   function init() {

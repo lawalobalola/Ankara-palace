@@ -26,16 +26,16 @@
           <a href="index.html">Home</a><span>/</span><span>Shop</span>
         </div>
         <h1>Our Fabric Collection</h1>
-        <p>Explore premium Nigerian and African textiles — handpicked for quality and crafted for the modern wardrobe.</p>
+        <p>Shop Ankara, Aso-Oke, Adire, lace and more. Compare fabric details and prices, then add your favourites to one cart.</p>
       </div>
     </section>
 
     <div class="container">
       <div class="shop-layout">
         <!-- Filters -->
-        <aside class="filters" id="filters" aria-label="Product filters">
+        <aside class="filters" id="filters" aria-label="Product filters" aria-labelledby="filters-title">
           <div class="filters__head">
-            <h2>Filters</h2>
+            <h2 id="filters-title" tabindex="-1">Refine your search</h2>
             <button type="button" class="filters__clear" id="clear-filters">Clear All</button>
           </div>
 
@@ -52,8 +52,8 @@
           <div class="filter-group">
             <h3>Price Range (₦)</h3>
             <div class="price-inputs">
-              <input type="number" id="filter-price-min" placeholder="Min" min="0" />
-              <input type="number" id="filter-price-max" placeholder="Max" min="0" />
+              <input type="number" id="filter-price-min" placeholder="Min" aria-label="Minimum price in naira" min="0" />
+              <input type="number" id="filter-price-max" placeholder="Max" aria-label="Maximum price in naira" min="0" />
             </div>
           </div>
 
@@ -64,19 +64,20 @@
               In Stock Only
             </label>
           </div>
+          <button type="button" class="btn btn--primary btn--block filters__done" id="filters-done">Show fabrics</button>
         </aside>
 
         <!-- Results -->
         <div>
           <div class="shop-toolbar">
-            <button type="button" class="filters-toggle" id="filters-toggle" aria-controls="filters" aria-expanded="false">
-              <i class="fa-solid fa-sliders"></i> Filters
-            </button>
             <div class="shop-search">
               <i class="fa-solid fa-magnifying-glass"></i>
               <label for="shop-search" class="visually-hidden">Search fabrics</label>
-              <input type="search" id="shop-search" placeholder="Search fabrics by name, colour or category..." />
+              <input type="search" id="shop-search" placeholder="Search fabrics, colours, styles…" />
             </div>
+            <button type="button" class="filters-toggle" id="filters-toggle" aria-controls="filters" aria-expanded="false">
+              <i class="fa-solid fa-sliders"></i> Filters <span class="filters-count" id="filters-count" hidden>0</span>
+            </button>
             <label for="shop-sort" class="visually-hidden">Sort by</label>
             <select id="shop-sort" class="shop-sort">
               <option value="newest">Newest First</option>

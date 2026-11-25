@@ -92,7 +92,7 @@
               <span class="product-info__price">${AP.formatNaira(unitPrice)} <small>/ ${selectedUnit === "trouser" ? "trouser" : "yard"}</small></span>
               <span class="stock-indicator ${!inStock ? "is-out" : lowStock ? "is-low" : ""}">
                 <span class="dot"></span>
-                ${!inStock ? "Out of stock" : lowStock ? `Only ${stock} left` : `${stock} in stock`}
+                ${!inStock ? "Out of stock" : lowStock ? `Only ${unitStock} left` : `${unitStock} available`}
               </span>
             </div>
 
@@ -160,13 +160,10 @@
             </div>
 
             <div class="product-cta">
-              <button type="button" class="btn btn--outline btn--lg" id="add-to-cart" ${!inStock ? "disabled" : ""}>
-                <i class="fa-solid fa-cart-plus"></i> Add to Cart
+              <button type="button" class="btn btn--primary btn--lg" id="add-to-cart" ${!inStock ? "disabled" : ""}>
+                <i class="fa-solid fa-cart-plus"></i> Add to cart
               </button>
-              <button type="button" class="btn btn--primary btn--lg" id="buy-now" ${!inStock ? "disabled" : ""}>
-                <i class="fa-solid fa-bag-shopping"></i> ${inStock ? "Buy Now" : "Out of Stock"}
-              </button>
-              <button type="button" class="btn btn--outline btn--lg" id="wishlist-btn">
+              <button type="button" class="btn btn--outline btn--lg" id="wishlist-btn" aria-label="Save to wishlist">
                 <i class="fa-regular fa-heart"></i> Save
               </button>
             </div>
@@ -188,14 +185,14 @@
           </div>
           <div class="tab-panel is-active" id="tab-description" role="tabpanel">
             <p>${escapeHtml(product.description || "")}</p>
-            <p class="color-muted">All Ankara Palace fabrics are inspected for quality before dispatch. Colour may vary slightly between screens and physical fabric due to lighting and monitor calibration.</p>
+            <p class="color-muted">Colour may look slightly different on screen because of lighting and display settings. Check the selected colour and design before adding the fabric to your cart.</p>
           </div>
           <div class="tab-panel" id="tab-reviews" role="tabpanel">
             <div id="reviews-list"></div>
           </div>
           <div class="tab-panel" id="tab-delivery" role="tabpanel">
-            <p>Orders are processed after payment confirmation. Dispatch typically occurs within 2–4 business days. Delivery timelines vary by location — see the <a href="faq.html">FAQ</a> for details.</p>
-            <p>Cancellations and returns are handled per our <a href="faq.html">returns policy</a>. Please contact support if you have any concerns.</p>
+            <p>Delivery cost and estimated timing depend on your location. Review the details shown at checkout before placing an order. This storefront preview does not arrange dispatch.</p>
+            <p>For a real purchase, ask the store about cancellations, returns and refunds before ordering. See the <a href="faq.html">FAQ</a> for more information.</p>
           </div>
         </div>
       </div>
@@ -297,9 +294,7 @@
       wishBtn.innerHTML = `<i class="${added ? "fa-solid" : "fa-regular"} fa-heart" style="color:${added ? "var(--terracotta)" : "inherit"}"></i> ${added ? "Saved" : "Save"}`;
     });
 
-    // Buy Now
     $("#add-to-cart").addEventListener("click", handleAddToCart);
-    $("#buy-now").addEventListener("click", handleBuyNow);
   }
 
   function currentCartItem() {
@@ -341,6 +336,7 @@
     } else items.push(item);
     AP.storage.set("ap_cart", items);
     toastSuccess("Added to your cart.");
+    document.dispatchEvent(new CustomEvent("ap:cart-updated", { detail: { count: items.reduce((sum, entry) => sum + (Number(entry.quantity) || 0), 0) } }));
   }
 
   function updateCalc() {
@@ -353,22 +349,6 @@
       rows[1].lastElementChild.textContent = `× ${quantity}`;
       rows[2].lastElementChild.textContent = AP.formatNaira(subtotal);
     }
-  }
-
-  function handleBuyNow() {
-    if (!validateSelection()) return;
-    sessionStorage.setItem("ap_checkout_items", JSON.stringify([currentCartItem()]));
-
-    const customer = AP.Session.getCustomer();
-    if (!customer) {
-      toastSuccess("Please sign in to complete your order.");
-      setTimeout(() => {
-        location.href = `login.html?redirect=checkout.html`;
-      }, 700);
-      return;
-    }
-
-    location.href = "checkout.html";
   }
 
   function renderRelated() {
@@ -387,7 +367,7 @@
 
     section.hidden = false;
     clear(grid);
-    related.forEach((p) => grid.appendChild(productCard(p, { showWishlist: true })));
+    related.forEach((p) => grid.appendChild(productCard(p, { showWishlist: true, quickAdd: true })));
   }
 
   function renderReviews() {

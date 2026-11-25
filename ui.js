@@ -168,6 +168,8 @@
     const img = (product.images && product.images[0]) || "ankara image.jpg";
     const stock = Number(product.stock) || 0;
     const inStock = stock > 0;
+    const minOrderQty = Math.max(1, Number(product.minOrderQty) || 1);
+    const canQuickAdd = Boolean(opts.quickAdd && inStock && stock >= minOrderQty);
 
     const badges = [];
     if (product.newArrival) badges.push('<span class="badge badge--emerald">New</span>');
@@ -190,20 +192,55 @@
         <div class="product-card__price">
           ${AP.formatNaira(product.pricePerYard)} <small>/ yard</small>
         </div>
-        <div class="product-card__actions">
-          <a href="product.html?id=${encodeURIComponent(product.id)}" class="btn btn--emerald btn--sm btn--block">
-            ${inStock ? "Buy Now" : "View Details"}
-          </a>
+        <div class="product-card__actions ${canQuickAdd ? "has-quick-add" : "details-only"}">
+          ${canQuickAdd ? `<button type="button" class="btn btn--primary btn--sm product-card__add" aria-label="Add ${escapeHtml(product.name)} to cart">
+            <i class="fa-solid fa-cart-plus" aria-hidden="true"></i><span>Add to cart</span>
+          </button>` : `<a href="product.html?id=${encodeURIComponent(product.id)}" class="btn btn--emerald btn--sm btn--block product-card__details">View details</a>`}
+          ${canQuickAdd ? `<a href="product.html?id=${encodeURIComponent(product.id)}" class="product-card__details">Details</a>` : ""}
         </div>
       </div>
     `;
+
+    const addButton = card.querySelector(".product-card__add");
+    if (addButton && canQuickAdd) addButton.addEventListener("click", () => {
+      const quantity = minOrderQty;
+      const item = {
+        productId: product.id,
+        name: product.name,
+        image: img,
+        unitType: "yard",
+        unitPrice: Number(product.pricePerYard) || 0,
+        quantity,
+        stockQuantity: quantity,
+        bundleYards: null,
+        color: (product.colors || [])[0] || "",
+        design: (product.designs || [])[0] || ""
+      };
+      if (quantity > stock) {
+        toast("The available stock is below the minimum order quantity.", "error");
+        return;
+      }
+      const items = AP.storage.get("ap_cart", []);
+      const existing = items.find((entry) => entry.productId === item.productId && entry.unitType === item.unitType && entry.color === item.color && entry.design === item.design);
+      if (existing && Number(existing.quantity) + quantity > Number(product.stock)) {
+        toast("That would exceed the available stock.", "error");
+        return;
+      }
+      if (existing) {
+        existing.quantity = Number(existing.quantity) + quantity;
+        existing.stockQuantity = existing.quantity;
+      } else items.push(item);
+      AP.storage.set("ap_cart", items);
+      toast(`${product.name} added to your cart.`, "success");
+      document.dispatchEvent(new CustomEvent("ap:cart-updated", { detail: { count: items.reduce((sum, entry) => sum + (Number(entry.quantity) || 0), 0) } }));
+    });
 
     if (opts.showWishlist && AP.Session.getCustomer()) {
       const customer = AP.Session.getCustomer();
       const isWished = AP.Collections.wishlist.has(customer.id, product.id);
       const wishBtn = document.createElement("button");
       wishBtn.type = "button";
-      wishBtn.className = "btn btn--ghost btn--sm";
+      wishBtn.className = "product-card__wishlist btn btn--ghost btn--sm";
       wishBtn.setAttribute("aria-pressed", String(isWished));
       wishBtn.innerHTML = `<i class="fa-solid fa-heart" style="color:${isWished ? "var(--terracotta)" : "inherit"}"></i>`;
       wishBtn.title = isWished ? "Remove from wishlist" : "Save to wishlist";

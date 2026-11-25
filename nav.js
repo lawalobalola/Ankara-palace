@@ -29,6 +29,9 @@
     const cartLink = showCart
       ? '<a href="cart.html" class="btn btn--ghost btn--sm"><i class="fa-solid fa-cart-shopping"></i> Cart <span data-cart-count></span></a>'
       : "";
+    const mobileCartLink = showCart
+      ? '<a href="cart.html" class="header-cart-mobile" aria-label="View cart"><i class="fa-solid fa-cart-shopping" aria-hidden="true"></i><span class="visually-hidden">Cart</span><span data-cart-count></span></a>'
+      : "";
 
     // Guest-visible links (customer-visible links are hidden once logged in)
     const discoverLinks = `
@@ -70,6 +73,8 @@
             ${authActions}
           </div>
 
+          ${mobileCartLink}
+
           <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu">
             <i class="fa-solid fa-bars" style="font-size:1.25rem;"></i>
           </button>
@@ -81,11 +86,9 @@
           ${discoverLinks}
           <a href="faq.html" ${isActive("faq.html")} data-ap-guest-only>FAQ</a>
           ${isLoggedIn
-            ? `${showCart ? `<a href="cart.html" class="btn btn--ghost">Cart <span data-cart-count></span></a>` : ""}
-               <a href="shop.html" class="btn btn--emerald">Shop</a>
+            ? `<a href="shop.html" class="btn btn--emerald">Shop</a>
                <a href="customer-dashboard.html" class="btn btn--outline">My Account</a>`
-            : `${showCart ? `<a href="cart.html" class="btn btn--ghost">Cart <span data-cart-count></span></a>` : ""}
-               <a href="login.html" class="btn btn--ghost">Login</a>
+            : `<a href="login.html" class="btn btn--ghost">Login</a>
                <a href="signup.html" class="btn btn--primary">Sign Up</a>`}
         </div>
       </div>
@@ -100,6 +103,11 @@
       const count = (AP.storage.get("ap_cart", []) || []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
       mount.querySelectorAll("[data-cart-count]").forEach((el) => { el.textContent = count ? `(${count})` : ""; });
     } catch (_) {}
+
+    document.addEventListener("ap:cart-updated", (event) => {
+      const count = Number(event.detail?.count) || 0;
+      mount.querySelectorAll("[data-cart-count]").forEach((el) => { el.textContent = count ? `(${count})` : ""; });
+    });
 
     const toggle = document.getElementById("nav-toggle");
     const menu = document.getElementById("mobile-menu");
