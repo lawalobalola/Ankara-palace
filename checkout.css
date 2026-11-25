@@ -1,0 +1,166 @@
+/* ============================================================
+   ANKARA PALACE — CHECKOUT & ORDER SUCCESS
+   ============================================================ */
+
+.checkout-layout {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: var(--sp-5);
+  padding-block: var(--sp-6);
+  align-items: start;
+}
+@media (max-width: 900px) { .checkout-layout { grid-template-columns: 1fr; } }
+
+.checkout-panel {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--sp-5);
+  margin-bottom: var(--sp-4);
+}
+.checkout-panel h2 {
+  font-size: 1.15rem;
+  margin-bottom: var(--sp-4);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.checkout-panel h2 i { color: var(--terracotta); font-size: 1rem; }
+
+.checkout-summary {
+  position: sticky;
+  top: calc(var(--header-h) + var(--sp-4));
+}
+.checkout-summary .checkout-panel { margin-bottom: 0; }
+
+.summary-item {
+  display: flex;
+  gap: var(--sp-3);
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--sp-3);
+}
+.summary-item img {
+  width: 70px;
+  height: 88px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: #EFE8D9;
+  flex-shrink: 0;
+}
+.summary-item__body { flex: 1; min-width: 0; }
+.summary-item__name {
+  font-weight: 600;
+  color: var(--charcoal);
+  font-size: 0.94rem;
+  margin: 0 0 2px;
+}
+.summary-item__meta {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin: 0 0 2px;
+}
+.summary-item__price {
+  font-weight: 700;
+  color: var(--charcoal);
+  font-size: 0.92rem;
+}
+
+.promo-row {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+}
+.promo-row input {
+  flex: 1;
+  padding: 0.6rem 0.9rem;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+}
+.promo-row button {
+  padding: 0.6rem 1.1rem;
+  border-radius: var(--radius);
+  background: var(--emerald);
+  color: var(--white);
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+.promo-row button:hover { background: var(--emerald-dark); }
+
+.summary-totals {
+  display: grid;
+  gap: var(--sp-2);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+}
+.summary-totals__row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.92rem;
+  color: var(--charcoal);
+}
+.summary-totals__row--discount { color: var(--success); }
+.summary-totals__row--grand {
+  border-top: 1px solid var(--border);
+  padding-top: var(--sp-3);
+  margin-top: var(--sp-2);
+  font-family: var(--font-heading);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--emerald);
+}
+
+/* Order success */
+.success-wrap {
+  max-width: 640px;
+  margin-inline: auto;
+  padding-block: var(--sp-7);
+  text-align: center;
+}
+.success-icon {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: rgba(46,107,79,0.14);
+  color: var(--success);
+  display: grid;
+  place-items: center;
+  font-size: 2.2rem;
+  margin: 0 auto var(--sp-4);
+}
+.success-wrap h1 {
+  margin-bottom: var(--sp-2);
+}
+.success-wrap > p {
+  color: var(--muted);
+  margin-bottom: var(--sp-5);
+}
+.success-ref {
+  background: var(--white);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  padding: var(--sp-4);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-5);
+  font-family: var(--font-body);
+}
+.success-ref span { color: var(--muted); font-size: 0.85rem; }
+.success-ref strong {
+  font-size: 1.1rem;
+  color: var(--emerald);
+  letter-spacing: 0.02em;
+}
+.success-actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-top: var(--sp-5);
+}
+
+@media (max-width: 900px) {
+  .checkout-summary { position: static; }
+}

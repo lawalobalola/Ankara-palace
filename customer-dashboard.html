@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>My Account — Ankara Palace</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="dashboard.css" />
+</head>
+<body data-requires-customer>
+  <a href="#main" class="visually-hidden">Skip to main content</a>
+  <header id="site-header"></header>
+
+  <main id="main">
+    <div class="container dash-shell">
+      <div class="dash-head">
+        <div>
+          <h1 id="dash-greeting">Welcome back</h1>
+          <p>Manage your orders, profile and preferences.</p>
+        </div>
+        <button type="button" class="btn btn--outline btn--sm dash-menu-toggle" id="dash-menu-toggle" aria-controls="dash-side" aria-expanded="false">
+          <i class="fa-solid fa-bars" aria-hidden="true"></i> Account Menu
+        </button>
+        <button type="button" class="btn btn--ghost btn--sm" id="logout-btn">
+          <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+        </button>
+      </div>
+
+      <div class="dash-layout">
+        <div class="dash-side-backdrop" id="dash-side-backdrop" hidden></div>
+        <aside class="dash-side" id="dash-side" aria-label="Account sections">
+          <nav class="dash-nav" id="dash-nav" aria-label="Account sections"></nav>
+        </aside>
+
+        <div class="dash-main" id="dash-main">
+          <!-- Sections rendered by customer.js -->
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script src="data.js"></script>
+  <script src="ui.js"></script>
+  <script src="nav.js"></script>
+  <script src="main.js"></script>
+  <script src="customer.js"></script>
+  <script src="all.js"></script>
+  <script src="ap-customer-service.js"></script>
+</body>
+</html>
+

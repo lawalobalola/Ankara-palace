@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Shop premium African fabrics at Ankara Palace — Ankara, Aso-Oke, Adire, lace and special collections." />
+  <title>Shop — Ankara Palace</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="home.css" />
+  <link rel="stylesheet" href="shop.css" />
+</head>
+<body>
+  <a href="#main" class="visually-hidden">Skip to main content</a>
+  <header id="site-header"></header>
+
+  <main id="main">
+    <section class="page-banner">
+      <div class="container">
+        <div class="breadcrumb">
+          <a href="index.html">Home</a><span>/</span><span>Shop</span>
+        </div>
+        <h1>Our Fabric Collection</h1>
+        <p>Explore premium Nigerian and African textiles — handpicked for quality and crafted for the modern wardrobe.</p>
+      </div>
+    </section>
+
+    <div class="container">
+      <div class="shop-layout">
+        <!-- Filters -->
+        <aside class="filters" id="filters" aria-label="Product filters">
+          <div class="filters__head">
+            <h2>Filters</h2>
+            <button type="button" class="filters__clear" id="clear-filters">Clear All</button>
+          </div>
+
+          <div class="filter-group">
+            <h3>Category</h3>
+            <div id="filter-categories"></div>
+          </div>
+
+          <div class="filter-group">
+            <h3>Colour</h3>
+            <div id="filter-colours"></div>
+          </div>
+
+          <div class="filter-group">
+            <h3>Price Range (₦)</h3>
+            <div class="price-inputs">
+              <input type="number" id="filter-price-min" placeholder="Min" min="0" />
+              <input type="number" id="filter-price-max" placeholder="Max" min="0" />
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <h3>Availability</h3>
+            <label class="filter-option">
+              <input type="checkbox" id="filter-in-stock" />
+              In Stock Only
+            </label>
+          </div>
+        </aside>
+
+        <!-- Results -->
+        <div>
+          <div class="shop-toolbar">
+            <button type="button" class="filters-toggle" id="filters-toggle" aria-controls="filters" aria-expanded="false">
+              <i class="fa-solid fa-sliders"></i> Filters
+            </button>
+            <div class="shop-search">
+              <i class="fa-solid fa-magnifying-glass"></i>
+              <label for="shop-search" class="visually-hidden">Search fabrics</label>
+              <input type="search" id="shop-search" placeholder="Search fabrics by name, colour or category..." />
+            </div>
+            <label for="shop-sort" class="visually-hidden">Sort by</label>
+            <select id="shop-sort" class="shop-sort">
+              <option value="newest">Newest First</option>
+              <option value="price-asc">Price: Low to High</option>
+              <option value="price-desc">Price: High to Low</option>
+              <option value="name-asc">Name: A–Z</option>
+              <option value="popular">Popularity</option>
+            </select>
+          </div>
+
+          <p class="shop-count" id="shop-count">Loading fabrics…</p>
+
+          <div class="shop-grid" id="shop-grid"></div>
+          <div class="load-more" id="load-more-wrap" hidden>
+            <button type="button" class="btn btn--outline" id="load-more">Load More</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script src="data.js"></script>
+  <script src="ui.js"></script>
+  <script src="nav.js"></script>
+  <script src="main.js"></script>
+  <script src="live.js"></script>
+  <script src="shop.js"></script>
+  <script src="all.js"></script>
+  <script src="ap-customer-service.js"></script>
+</body>
+</html>

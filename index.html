@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Ankara Palace — premium African and Nigerian traditional fabrics. Discover Ankara, Aso-Oke, Adire, lace and special collections." />
+  <title>Ankara Palace — African Fabric and Elegance</title>
+
+  <!--
+    AUTHENTICATED HOMEPAGE GUARD
+    ------------------------------------------------------------
+    Guests and admins may view the homepage. Authenticated CUSTOMERS
+    are redirected to shop.html. This runs synchronously before any
+    other script so nothing flashes and no partial render occurs.
+
+    It reads the same session key that AP.Session uses:
+      localStorage["ap_session_customer"]  -> customer session object
+
+    No redirect loops: shop.html does not contain this guard.
+  -->
+  <script>
+    (function () {
+      try {
+        var raw = localStorage.getItem("ap_session_customer");
+        if (!raw) return;
+        var session = JSON.parse(raw);
+        if (session && session.id) {
+          var target = "shop.html";
+          var current = location.pathname.split("/").pop() || "index.html";
+          if (current !== "shop.html") {
+            location.replace(target);
+          }
+        }
+      } catch (err) {
+        // Corrupted session — ignore, treat as guest
+      }
+    })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="home.css" />
+</head>
+<body>
+  <a href="#main" class="visually-hidden">Skip to main content</a>
+
+  <header id="site-header"></header>
+
+  <main id="main">
+    <!-- HERO -->
+    <section class="hero">
+      <div class="container">
+        <div class="hero__inner">
+          <div>
+            <span class="hero__eyebrow">Nigerian Heritage Textiles</span>
+            <h1>Timeless African Fabric, <em>Beautifully Delivered</em></h1>
+          <p class="hero__lead">
+              Explore Ankara, Aso-Oke, Adire and lace fabrics for everyday style and special occasions.
+              Compare designs, choose your quantity and review delivery details before ordering.
+            </p>
+            <div class="hero__cta">
+              <a href="shop.html" class="btn btn--primary btn--lg">
+                <i class="fa-solid fa-bag-shopping"></i> Shop Now
+              </a>
+              <a href="collections.html" class="btn btn--outline btn--lg">
+                Discover Our Collection <i class="fa-solid fa-arrow-right"></i>
+              </a>
+            </div>
+            <div class="hero__stats">
+              <div class="hero__stat">
+                <strong id="stat-products">—</strong>
+                <span>Curated Fabrics</span>
+              </div>
+              <div class="hero__stat">
+                <strong id="stat-collections">—</strong>
+                <span>Fabric Collections</span>
+              </div>
+              <div class="hero__stat">
+                <strong>Per yard</strong>
+                <span>Clear unit pricing</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="hero__visual">
+            <img src="ankara image.jpg" alt="Premium Nigerian Ankara fabric detail" />
+            <div class="hero__badge">
+              <i class="fa-solid fa-award"></i>
+              <div>
+                <p>Handpicked Premium Fabrics</p>
+                <small>Authentic Nigerian heritage textiles</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TRUST STRIP -->
+    <section class="trust-strip">
+      <div class="container">
+        <div class="trust-grid">
+          <div class="trust-item">
+            <i class="fa-solid fa-truck-fast"></i>
+            <div>
+              <strong>Delivery details</strong>
+              <span>Shown before you place an order</span>
+            </div>
+          </div>
+          <div class="trust-item">
+            <i class="fa-solid fa-shield-halved"></i>
+            <div>
+              <strong>Bank transfer</strong>
+              <span>Payment receipt reviewed by the store</span>
+            </div>
+          </div>
+          <div class="trust-item">
+            <i class="fa-solid fa-scissors"></i>
+            <div>
+              <strong>Flexible quantities</strong>
+              <span>Choose yards or a configured bundle</span>
+            </div>
+          </div>
+          <div class="trust-item">
+            <i class="fa-solid fa-headset"></i>
+            <div>
+              <strong>Order updates</strong>
+              <span>Follow order status from your account</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COLLECTIONS -->
+    <section class="section">
+      <div class="container">
+        <div class="section-head">
+          <span class="section-head__eyebrow">Curated Collections</span>
+          <h2 class="section-head__title">Explore Our Signature Fabrics</h2>
+              <p class="section-head__sub">Browse fabrics by style and find a print that suits your next outfit or occasion.</p>
+        </div>
+          <!-- Collection cards are rendered by home.js. -->
+        <div class="collections-grid" id="collections-grid"></div>
+      </div>
+    </section>
+
+    <!-- NEW ARRIVALS -->
+    <section class="section section--white">
+      <div class="container">
+        <div class="section-head section-head--left" style="flex-direction:row; justify-content:space-between; text-align:left; align-items:flex-end;">
+          <div>
+            <span class="section-head__eyebrow">Just Arrived</span>
+            <h2 class="section-head__title">New Arrivals</h2>
+            <p class="section-head__sub">The latest additions to the Ankara Palace catalogue.</p>
+          </div>
+          <a href="shop.html?sort=newest" class="btn btn--outline btn--sm">View All</a>
+        </div>
+        <div class="product-grid" id="new-arrivals-grid"></div>
+      </div>
+    </section>
+
+    <!-- PROMO BANNER -->
+    <section class="section">
+      <div class="container">
+        <div class="promo-banner">
+          <div>
+            <p class="promo-banner__eyebrow">Welcome to Ankara Palace</p>
+            <h2>A little something for your first order</h2>
+            <p>Enter <strong>WELCOME10</strong> at checkout for 10% off eligible items. Offer settings may change.</p>
+            <a href="shop.html" class="btn btn--primary btn--lg">Start Shopping</a>
+          </div>
+          <div class="promo-banner__visual">
+            <img src="ankara  2.jpeg" alt="Ankara fabric detail" />
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BESTSELLERS -->
+    <section class="section section--white">
+      <div class="container">
+        <div class="section-head section-head--left" style="flex-direction:row; justify-content:space-between; text-align:left; align-items:flex-end;">
+          <div>
+            <span class="section-head__eyebrow">From the catalogue</span>
+            <h2 class="section-head__title">Featured Fabrics</h2>
+            <p class="section-head__sub">A few highlights from the current Ankara Palace catalogue.</p>
+          </div>
+          <a href="shop.html" class="btn btn--outline btn--sm">View All</a>
+        </div>
+        <div class="product-grid" id="bestsellers-grid"></div>
+      </div>
+    </section>
+
+    <!-- HOW IT WORKS -->
+    <section class="section">
+      <div class="container">
+        <div class="section-head">
+          <span class="section-head__eyebrow">A simple shopping journey</span>
+          <h2 class="section-head__title">From fabric discovery to order review</h2>
+          <p class="section-head__sub">Choose your fabric, build one cart, then review the full order before you place it.</p>
+        </div>
+        <div class="shopping-steps">
+          <div class="why-card">
+            <span class="shopping-step__number">01</span>
+            <div class="why-card__icon"><i class="fa-solid fa-magnifying-glass"></i></div>
+            <h3>Explore the collection</h3>
+            <p>Browse fabric photos, colours, designs, prices and available units.</p>
+          </div>
+          <div class="why-card">
+            <span class="shopping-step__number">02</span>
+            <div class="why-card__icon"><i class="fa-solid fa-cart-shopping"></i></div>
+            <h3>Build your cart</h3>
+            <p>Add one fabric or combine several fabrics, then adjust quantities together.</p>
+          </div>
+          <div class="why-card">
+            <span class="shopping-step__number">03</span>
+            <div class="why-card__icon"><i class="fa-solid fa-clipboard-check"></i></div>
+            <h3>Review before ordering</h3>
+            <p>Confirm delivery details and the total. Transfer receipts are marked pending until reviewed by an admin.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CUSTOMER FEEDBACK PLACEHOLDER REMOVED: show the real shopping flow instead. -->
+    <section class="section section--white">
+      <div class="container">
+        <div class="section-head">
+          <span class="section-head__eyebrow">Before you order</span>
+          <h2 class="section-head__title">Know what happens next</h2>
+          <p class="section-head__sub">The current storefront preview stores activity in this browser. It does not send email or verify bank payments automatically.</p>
+        </div>
+        <div class="preview-note">
+          <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+          <p>For a live store, connect account verification, order storage, email delivery and payment review to a secure backend.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- NEWSLETTER -->
+    <section class="section">
+      <div class="container">
+        <div class="newsletter">
+          <div>
+            <h2>Stay in the Know</h2>
+            <p>Join the Ankara Palace updates list. In this preview, signups are saved only in this browser and no emails are sent.</p>
+          </div>
+          <form data-newsletter novalidate>
+            <label for="newsletter-email" class="visually-hidden">Email address</label>
+            <input type="email" id="newsletter-email" placeholder="Enter your email address" required />
+            <button type="submit">Subscribe</button>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer id="site-footer"></footer>
+
+  <script src="data.js"></script>
+  <script src="ui.js"></script>
+  <script src="nav.js"></script>
+  <script src="main.js"></script>
+  <script src="live.js"></script>
+  <script src="home.js"></script>
+  <script src="all.js"></script>
+  <script src="ap-customer-service.js"></script>
+</body>
+</html>
+

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact — Ankara Palace</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="home.css" />
+  <link rel="stylesheet" href="pages.css" />
+</head>
+<body>
+  <a href="#main" class="visually-hidden">Skip to main content</a>
+  <header id="site-header"></header>
+
+  <main id="main">
+    <section class="page-banner">
+      <div class="container">
+        <div class="breadcrumb">
+          <a href="index.html">Home</a><span>/</span><span>Contact</span>
+        </div>
+        <h1>Get in Touch</h1>
+        <p>We would love to hear from you. Reach out for orders, enquiries or fabric guidance.</p>
+      </div>
+    </section>
+
+    <div class="container">
+      <div class="contact-layout">
+        <div class="contact-panel">
+          <h2>Send Us a Message</h2>
+          <p class="color-muted">Use this form to draft a message. In this preview it is saved in your browser and is not sent to the store.</p>
+          <form id="contact-form" novalidate>
+            <div class="form-group">
+              <label for="contact-name" class="form-label">Full Name <span class="req">*</span></label>
+              <input type="text" id="contact-name" class="form-control" required autocomplete="name" />
+            </div>
+            <div class="form-group">
+              <label for="contact-email" class="form-label">Email Address <span class="req">*</span></label>
+              <input type="email" id="contact-email" class="form-control" required autocomplete="email" />
+            </div>
+            <div class="form-group">
+              <label for="contact-phone" class="form-label">Phone Number</label>
+              <input type="tel" id="contact-phone" class="form-control" autocomplete="tel" />
+            </div>
+            <div class="form-group">
+              <label for="contact-message" class="form-label">Message <span class="req">*</span></label>
+              <textarea id="contact-message" class="form-control" rows="5" required></textarea>
+            </div>
+            <button type="submit" class="btn btn--primary btn--lg w-full">
+              <i class="fa-solid fa-paper-plane"></i> Send Message
+            </button>
+          </form>
+        </div>
+
+        <div>
+          <div class="contact-panel">
+            <h2>Contact Details</h2>
+            <ul class="contact-info-list" id="contact-info-list"></ul>
+          </div>
+
+          <div class="contact-whatsapp">
+            <h3>Prefer WhatsApp?</h3>
+            <p>Chat with our team directly for quick answers and fabric recommendations.</p>
+            <a id="whatsapp-link" href="#" target="_blank" rel="noopener">
+              <i class="fa-brands fa-whatsapp"></i> Chat on WhatsApp
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer id="site-footer"></footer>
+  <script src="data.js"></script>
+  <script src="ui.js"></script>
+  <script src="nav.js"></script>
+  <script src="main.js"></script>
+  <script src="live.js"></script>
+  <script src="all.js"></script>
+  <script src="ap-customer-service.js"></script>
+  <script>
+    (function () {
+      const settings = AP.Collections.settings.get();
+      const list = document.getElementById("contact-info-list");
+      if (list) {
+        list.innerHTML = `
+          <li><i class="fa-solid fa-envelope"></i><div><strong>Email</strong><span>${UI.escapeHtml(settings.storeEmail || "")}</span></div></li>
+          <li><i class="fa-solid fa-phone"></i><div><strong>Phone</strong><span>${UI.escapeHtml(settings.storePhone || "")}</span></div></li>
+          <li><i class="fa-brands fa-whatsapp"></i><div><strong>WhatsApp</strong><span>${UI.escapeHtml(settings.whatsapp || "")}</span></div></li>
+          <li><i class="fa-solid fa-location-dot"></i><div><strong>Location</strong><span>${UI.escapeHtml(settings.address || "")}</span></div></li>
+          <li><i class="fa-regular fa-clock"></i><div><strong>Support Hours</strong><span>Mon – Sat, 9:00am – 6:00pm WAT</span></div></li>
+        `;
+      }
+      const wa = document.getElementById("whatsapp-link");
+      if (wa) {
+        const digits = (settings.whatsapp || "").replace(/[^\d]/g, "");
+        wa.href = digits ? `https://wa.me/${digits}` : "#";
+      }
+    })();
+  </script>
+</body>
+</html>
