@@ -712,6 +712,25 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   .footer-grid { grid-template-columns: minmax(0,1.4fr) repeat(2,minmax(140px,1fr)); gap: var(--sp-6) var(--sp-4); }
 }
 @media (max-width: 520px) {
+  :root { --header-h: 68px; }
+  body { font-size: 17px; line-height: 1.7; }
+  .container { padding-inline: 20px; }
+  .section { padding-block: 52px; }
+  h1 { font-size: clamp(2.15rem, 9vw, 2.8rem); }
+  h2 { font-size: clamp(1.7rem, 7vw, 2.2rem); }
+  .btn { min-height: 48px; padding: 0.8rem 1.15rem; font-size: 1rem; }
+  .btn--sm { min-height: 44px; padding: 0.65rem 0.9rem; font-size: 0.95rem; }
+  .header-inner { gap: var(--sp-3); }
+  .logo { font-size: 1.2rem; }
+  .logo__mark { width: 40px; height: 40px; }
+  .nav-toggle { min-width: 44px; min-height: 44px; justify-content: center; }
+  .mobile-menu__inner { gap: var(--sp-2); padding-block: var(--sp-4) var(--sp-5); }
+  .mobile-menu a { min-height: 48px; display: flex; align-items: center; font-size: 1.03rem; }
+  .form-control, input, select, textarea { font-size: 16px; }
+  .form-control { min-height: 48px; padding: 0.8rem 0.9rem; }
+  .product-card__body { padding: 16px; gap: 10px; }
+  .product-card__name { font-size: 1.15rem; }
+  .product-card__actions { flex-wrap: wrap; }
   .site-footer { padding-top: var(--sp-7); margin-top: var(--sp-7); }
   .footer-grid { grid-template-columns: 1fr 1fr; gap: var(--sp-6) var(--sp-4); }
   .footer-brand { grid-column: 1 / -1; }
