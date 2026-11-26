@@ -85,6 +85,7 @@
   <script src="ap-customer-service.js"></script>
   <script>
     (function () {
+      function renderContactSettings() {
       const settings = AP.Collections.settings.get();
       const list = document.getElementById("contact-info-list");
       if (list) {
@@ -101,6 +102,11 @@
         const digits = (settings.whatsapp || "").replace(/[^\d]/g, "");
         wa.href = digits ? `https://wa.me/${digits}` : "#";
       }
+      }
+      renderContactSettings();
+      window.addEventListener("ap:data-change", (event) => {
+        if (event.detail?.key === AP.KEYS.settings) renderContactSettings();
+      });
     })();
   </script>
 </body>

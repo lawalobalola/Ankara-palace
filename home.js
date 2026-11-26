@@ -86,6 +86,14 @@
     if (image && settings.heroImage) image.src = settings.heroImage;
   }
 
+  function updateAnnouncement() {
+    const bar = document.querySelector("[data-store-announcement]");
+    if (!bar) return;
+    const message = String(AP.Collections.settings.get()?.announcement || "").trim();
+    bar.textContent = message;
+    bar.hidden = !message;
+  }
+
   function animateHeroHeadline() {
     const heading = document.querySelector(".hero h1");
     if (!heading || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -138,19 +146,15 @@
     renderBestsellers();
     updateHeroStats();
     updateHeroImage();
+    updateAnnouncement();
     animateHeroHeadline();
-    const searchForm = $("#home-search");
-    if (searchForm) searchForm.addEventListener("submit", (event) => {
-      event.preventDefault();
-      const query = $("#home-search-input")?.value.trim() || "";
-      location.href = query ? `shop.html?q=${encodeURIComponent(query)}` : "shop.html";
-    });
     const refresh = () => {
       renderCollections();
       renderNewArrivals();
       renderBestsellers();
       updateHeroStats();
       updateHeroImage();
+      updateAnnouncement();
     };
     const refreshIfCatalogueChanged = (key) => {
       if (key === AP.KEYS.products || key === AP.KEYS.categories || key === AP.KEYS.settings) refresh();

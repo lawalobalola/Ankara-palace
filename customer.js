@@ -227,8 +227,8 @@
       if (!check.ok) { toastError(check.error); avatarInput.value = ""; return; }
       try {
         const dataUrl = await AP.Uploads.fileToDataURL(file);
-        AP.Collections.customers.update(customer.id, { avatarDataUrl: dataUrl });
-        customer = AP.Collections.customers.byId(customer.id);
+        customer = AP.Collections.customers.update(customer.id, { avatarDataUrl: dataUrl });
+        if (!customer) { toastError(window.AP_LAST_PROFILE_ERROR || "Could not save the profile picture."); return; }
         AP.Session.loginCustomer(customer);
         toastSuccess("Profile picture updated.");
         renderSection();
@@ -255,12 +255,13 @@
       const existing = AP.Collections.customers.byEmail(email.value);
       if (existing && existing.id !== customer.id) { UI.fieldError(email, "This email is already in use."); return; }
 
-      AP.Collections.customers.update(customer.id, {
+      const updated = AP.Collections.customers.update(customer.id, {
         name: name.value.trim(),
         email: email.value.trim().toLowerCase(),
         phone: phone.value.trim()
       });
-      customer = AP.Collections.customers.byId(customer.id);
+      if (!updated) { toastError(window.AP_LAST_PROFILE_ERROR || "Could not save your profile."); return; }
+      customer = updated;
       AP.Session.loginCustomer(customer);
       toastSuccess("Profile updated.");
     });

@@ -3,9 +3,8 @@
    Changes:
      - Product image upload replaces URL text field.
      - Order modal surfaces uploaded receipts with previews.
-     - Status transitions use the new chain:
-         Pending → Awaiting Payment → Accepted →
-         Ready to Dispatch → Shipped → Delivered
+     - Order tracking continues as:
+         Accepted → Shipped → Ready to Dispatch → Delivered
      - "Confirm payment" advances Awaiting Payment → Accepted
        and sets paymentStatus to "paid".
    ============================================================ */
@@ -522,6 +521,7 @@
     }
 
     draw();
+    window.addEventListener("ap:orders-change", draw);
     statusFilter.addEventListener("change", draw);
     search.addEventListener("input", draw);
   }
@@ -722,6 +722,7 @@
 
     draw();
     search.addEventListener("input", draw);
+    window.addEventListener("ap:customers-change", draw);
   }
 
   function openCustomerModal(id) {
@@ -1087,12 +1088,51 @@
         </div>
         <button type="submit" class="btn btn--primary"><i class="fa-solid fa-floppy-disk"></i> Save Settings</button>
       </form>
+      <section style="margin-top:var(--sp-6);padding-top:var(--sp-5);border-top:1px solid var(--border);">
+        <h2>Delivery fees by state</h2>
+        <p class="color-muted">Set a fee for each state. States without a custom fee use the default delivery fee above.</p>
+        <form id="delivery-rate-form" class="admin-form-grid" style="align-items:end;">
+          <div class="form-group"><label class="form-label" for="delivery-state">State</label><select id="delivery-state" class="form-control" required>${AP.NIGERIAN_STATES.map((state) => `<option value="${escapeHtml(state)}">${state === "FCT" ? "Abuja (FCT)" : escapeHtml(state)}</option>`).join("")}</select></div>
+          <div class="form-group"><label class="form-label" for="delivery-rate">Delivery fee (₦)</label><input id="delivery-rate" class="form-control" type="number" min="0" step="1" required /></div>
+          <button type="submit" class="btn btn--primary">Save state fee</button>
+        </form>
+        <div style="overflow-x:auto;margin-top:var(--sp-4);"><table class="admin-table" style="width:100%;"><thead><tr><th>State</th><th>Fee</th><th></th></tr></thead><tbody id="delivery-rates-table"></tbody></table></div>
+      </section>
       <h2 style="margin-top:var(--sp-6);">Admin Profile</h2>
       <p class="color-muted" style="font-size:0.9rem;">Signed in as <strong>${escapeHtml(admin?.email || "")}</strong></p>
       <div style="margin-top:var(--sp-5); padding:var(--sp-3); background:var(--cream); border:1px dashed var(--border-strong); border-radius:var(--radius); font-size:0.82rem; color:var(--muted);">
         <strong style="color:var(--charcoal);">Security notice:</strong> This admin dashboard is a frontend demonstration. Role checks occur only in the browser and are not secure for production.
       </div>`;
     mount.appendChild(card);
+    const renderRates = () => {
+      const rates = AP.Collections.settings.get().deliveryFees || {};
+      const rows = Object.entries(rates).filter(([state, fee]) => AP.NIGERIAN_STATES.includes(state) && Number.isFinite(Number(fee)) && Number(fee) >= 0);
+      card.querySelector("#delivery-rates-table").innerHTML = rows.length
+        ? rows.sort(([a], [b]) => a.localeCompare(b)).map(([state, fee]) => `<tr><td>${state === "FCT" ? "Abuja (FCT)" : escapeHtml(state)}</td><td>${AP.formatNaira(Number(fee))}</td><td><button type="button" class="btn btn--ghost btn--sm" data-remove-delivery-state="${escapeHtml(state)}">Remove</button></td></tr>`).join("")
+        : `<tr><td colspan="3" class="color-muted">No state fees set. All states use the default fee.</td></tr>`;
+    };
+    renderRates();
+    card.querySelector("#delivery-rate-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const state = card.querySelector("#delivery-state").value;
+      const fee = Number(card.querySelector("#delivery-rate").value);
+      if (!AP.NIGERIAN_STATES.includes(state) || !Number.isFinite(fee) || fee < 0) { toastError("Enter a valid state and fee."); return; }
+      const deliveryFees = { ...(AP.Collections.settings.get().deliveryFees || {}), [state]: fee };
+      if (!await AP.Collections.settings.save({ deliveryFees })) { toastError("The delivery fee could not be saved."); return; }
+      renderRates();
+      card.querySelector("#delivery-rate").value = "";
+      toastSuccess(`Delivery fee for ${state === "FCT" ? "Abuja (FCT)" : state} saved.`);
+    });
+    card.querySelector("#delivery-rates-table").addEventListener("click", async (e) => {
+      const button = e.target.closest("[data-remove-delivery-state]");
+      if (!button) return;
+      const state = button.dataset.removeDeliveryState;
+      const deliveryFees = { ...(AP.Collections.settings.get().deliveryFees || {}) };
+      delete deliveryFees[state];
+      if (!await AP.Collections.settings.save({ deliveryFees })) { toastError("The delivery fee could not be removed."); return; }
+      renderRates();
+      toastSuccess("State fee removed. The default fee will apply.");
+    });
     card.querySelector("#settings-form").addEventListener("submit", (e) => {
       e.preventDefault();
       const data = Object.fromEntries(new FormData(e.target).entries());
@@ -1155,6 +1195,9 @@
     renderTopbarActions();
     renderSection();
     initMobileSidebar();
+    window.addEventListener("ap:customers-change", () => {
+      if (currentSection === "overview") renderSection();
+    });
     $("#admin-logout").addEventListener("click", async () => {
       const ok = await confirmDialog({ title: "Sign Out", message: "Sign out of the admin console?", confirmLabel: "Sign Out" });
       if (!ok) return;

@@ -334,7 +334,10 @@
       existing.quantity += item.quantity;
       existing.stockQuantity = selectedUnit === "bundle" ? existing.quantity * Number(product.bundleYards) : existing.quantity;
     } else items.push(item);
-    AP.storage.set("ap_cart", items);
+    if (!AP.storage.set(AP.KEYS.cart || "ap_cart", items)) {
+      toastError("We couldn't save your cart. Please check your browser storage and try again.");
+      return;
+    }
     toastSuccess("Added to your cart.");
     document.dispatchEvent(new CustomEvent("ap:cart-updated", { detail: { count: items.reduce((sum, entry) => sum + (Number(entry.quantity) || 0), 0) } }));
   }

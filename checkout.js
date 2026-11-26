@@ -54,10 +54,10 @@
 
   function render() {
     const root = $("#checkout-root");
-    const totals = AP.OrderCalc.calculate(cart, { promo });
     const addresses = getAddresses();
     const selectedAddr = addresses.find((a) => a.id === useAddressId) || defaultAddress();
     const addr = selectedAddr || AP.Address.empty();
+    const totals = AP.OrderCalc.calculate(cart, { promo, state: addr.state });
 
     root.innerHTML = `
       <div class="dash-head" style="margin-bottom:var(--sp-4);">
@@ -117,7 +117,10 @@
                 </div>
                 <div class="form-group">
                   <label class="form-label">State <span class="req">*</span></label>
-                  <input type="text" id="co-state" class="form-control" value="${escapeHtml(addr.state || "")}" required />
+                  <select id="co-state" class="form-control" required>
+                    <option value="">Choose your state</option>
+                    ${AP.NIGERIAN_STATES.map((state) => `<option value="${escapeHtml(state)}" ${AP.deliveryStateKey(addr.state) === state ? "selected" : ""}>${state === "FCT" ? "Abuja (FCT)" : escapeHtml(state)}</option>`).join("")}
+                  </select>
                   <div class="form-error"></div>
                 </div>
               </div>
@@ -177,9 +180,9 @@
 
             <div class="summary-totals">
               <div class="summary-totals__row"><span>Subtotal</span><span>${AP.formatNaira(totals.subtotal)}</span></div>
-              <div class="summary-totals__row"><span>Delivery</span><span>${totals.deliveryFee === 0 ? "Free" : AP.formatNaira(totals.deliveryFee)}</span></div>
+              <div class="summary-totals__row"><span id="delivery-fee-label">Delivery${totals.deliveryState ? ` to ${escapeHtml(totals.deliveryState === "FCT" ? "Abuja (FCT)" : totals.deliveryState)}` : ""}</span><span id="delivery-fee-value">${totals.deliveryFee === 0 ? "Free" : AP.formatNaira(totals.deliveryFee)}</span></div>
               ${totals.discount > 0 ? `<div class="summary-totals__row summary-totals__row--discount"><span>Discount (${escapeHtml(promo.code)})</span><span>−${AP.formatNaira(totals.discount)}</span></div>` : ""}
-              <div class="summary-totals__row summary-totals__row--grand"><span>Total</span><span>${AP.formatNaira(totals.total)}</span></div>
+              <div class="summary-totals__row summary-totals__row--grand"><span>Total</span><span id="order-total-value">${AP.formatNaira(totals.total)}</span></div>
             </div>
 
             <button type="button" class="btn btn--primary btn--lg btn--block" id="place-order" style="margin-top:var(--sp-4);">
@@ -200,6 +203,16 @@
   }
 
   function bind() {
+    const stateSelect = $("#co-state");
+    if (stateSelect) stateSelect.addEventListener("change", () => {
+      const totals = AP.OrderCalc.calculate(cart, { promo, state: stateSelect.value });
+      const fee = $("#delivery-fee-value");
+      const label = $("#delivery-fee-label");
+      const total = $("#order-total-value");
+      if (label) label.textContent = totals.deliveryState ? `Delivery to ${totals.deliveryState === "FCT" ? "Abuja (FCT)" : totals.deliveryState}` : "Delivery";
+      if (fee) fee.textContent = totals.deliveryFee === 0 ? "Free" : AP.formatNaira(totals.deliveryFee);
+      if (total) total.textContent = AP.formatNaira(totals.total);
+    });
     const addrSelect = $("#addr-select");
     if (addrSelect) {
       addrSelect.addEventListener("change", () => { useAddressId = addrSelect.value; render(); });
@@ -299,7 +312,7 @@
     const btn = $("#place-order");
     if (btn) { btn.disabled = true; btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Placing Order…`; }
 
-    const totals = AP.OrderCalc.calculate(cart, { promo });
+    const totals = AP.OrderCalc.calculate(cart, { promo, state: delivery.state });
     const order = {
       id: AP.uid("order-"),
       ref: AP.orderRef(),
@@ -332,7 +345,17 @@
       adminNotes: []
     };
 
-    AP.Collections.orders.add(order);
+    const savedOrder = AP.Collections.orders.add(order);
+    if (!savedOrder) {
+      placing = false;
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-lock"></i> Place Order`;
+      }
+      const reason = AP.getLastOrderError?.();
+      toastError(reason ? `Couldn't place the order: ${reason}` : "We couldn't place the order. Please check your connection and try again.");
+      return;
+    }
 
     requestedByProduct.forEach((quantity, productId) => {
       const product = AP.Collections.products.byId(productId);
@@ -368,8 +391,12 @@
   }
 
   function init() {
-    customer = AP.Collections.customers.byId(AP.Session.getCustomer()?.id);
+    const savedSession = AP.Session.getCustomer();
+    customer = AP.sharedConnected()
+      ? (savedSession ? AP.Auth.currentCustomer() : null)
+      : AP.Collections.customers.byId(savedSession?.id);
     if (!customer) {
+      if (savedSession && AP.sharedConnected()) AP.Session.logoutCustomer();
       if (loadCart().length) location.replace("login.html?redirect=checkout.html");
       else notFound();
       return;

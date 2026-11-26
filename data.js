@@ -3,9 +3,8 @@
    See previous delivery for the full rationale.
    Changes in this version:
      - Order status flow aligned with customer journey:
-         Pending → Awaiting Payment → (payment confirmed)
-              → Accepted → (shipped) → Ready to Dispatch
-              → Shipped → Delivered
+     Pending → Awaiting Payment → (payment confirmed)
+            → Accepted → Shipped → Ready to Dispatch → Delivered
        Rejected / Cancelled are terminal.
      - AP.Address helpers for the simplified address model
        (Local Government Area, street, state, country).
@@ -28,6 +27,7 @@
     wishlist: "ap_wishlist",
     promos: "ap_promos",
     reviews: "ap_reviews",
+    cart: "ap_cart",
     visitors: "ap_visitors",
     logs: "ap_admin_logs",
     sessionCustomer: "ap_session_customer",
@@ -37,12 +37,68 @@
     settings: "ap_settings"
   };
 
+  // Server data is the source of truth. Browser storage remains a cache and
+  // migration source so existing demo data is carried forward on first run.
+  const sharedState = (() => {
+    try {
+      const request = new XMLHttpRequest();
+      request.open("GET", "/api/state", false);
+      request.send();
+      if (request.status >= 200 && request.status < 300) return JSON.parse(request.responseText || "{}");
+    } catch (error) {
+      console.warn("[AP.Db] Shared server is unavailable; using this browser's saved data.", error);
+    }
+    return null;
+  })();
+  let sharedReady = Boolean(sharedState);
+  let lastOrderError = "";
+
+  function apiRequest(method, route, body) {
+    try {
+      const request = new XMLHttpRequest();
+      request.open(method, route, false);
+      if (body !== undefined) request.setRequestHeader("Content-Type", "application/json");
+      request.send(body === undefined ? null : JSON.stringify(body));
+      let payload = {};
+      try { payload = JSON.parse(request.responseText || "{}"); } catch (_) {}
+      return { ok: request.status >= 200 && request.status < 300, status: request.status, ...payload };
+    } catch (_) {
+      return { ok: false, status: 0, error: "The server is not available. Please try again." };
+    }
+  }
+  // Private account/order data and per-visitor activity stay on the visitor's
+  // browser until those flows are moved to their own authenticated endpoints.
+  const localOnlyKeys = new Set([
+    KEYS.sessionCustomer, KEYS.sessionAdmin, KEYS.customers, KEYS.admin,
+    KEYS.orders, KEYS.notifications, KEYS.wishlist, KEYS.reviews, KEYS.cart,
+    KEYS.visitors, KEYS.logs, KEYS.newsletter, KEYS.seeded
+  ]);
+
+  function saveSharedValue(key, value) {
+    if (!sharedReady || localOnlyKeys.has(key)) return true;
+    try {
+      const request = new XMLHttpRequest();
+      request.open("PUT", `/api/state/${encodeURIComponent(key)}`, false);
+      request.setRequestHeader("Content-Type", "application/json");
+      request.send(JSON.stringify({ value }));
+      if (request.status < 200 || request.status >= 300) throw new Error(`Server returned ${request.status}`);
+      sharedState[key] = value;
+      return true;
+    } catch (error) {
+      console.error("[AP.Db] Could not save shared data for", key, error);
+      return false;
+    }
+  }
+
   const storage = {
     get(key, fallback) {
       try {
+        if (sharedReady && Object.prototype.hasOwnProperty.call(sharedState, key)) return sharedState[key];
         const raw = localStorage.getItem(key);
         if (raw === null) return fallback;
-        return JSON.parse(raw);
+        const value = JSON.parse(raw);
+        if (sharedReady && !localOnlyKeys.has(key)) saveSharedValue(key, value);
+        return value;
       } catch (err) {
         console.warn("[AP.Db] Corrupt stored value for", key, "— resetting to fallback.");
         try { localStorage.removeItem(key); } catch (_) {}
@@ -50,10 +106,17 @@
       }
     },
     set(key, value) {
+      const serverSaved = saveSharedValue(key, value);
+      let localSaved = true;
+      try { localStorage.setItem(key, JSON.stringify(value)); } catch (err) {
+        localSaved = false;
+        // The server is the source of truth; a full browser cache must not
+        // prevent an upload or admin change from reaching other customers.
+        console.warn("[AP.Db] Saved on server; browser cache could not be updated for", key, err);
+      }
       try {
-        localStorage.setItem(key, JSON.stringify(value));
         try { window.dispatchEvent(new CustomEvent("ap:data-change", { detail: { key } })); } catch (_) {}
-        return true;
+        return localOnlyKeys.has(key) ? localSaved : serverSaved && localSaved;
       } catch (err) {
         console.error("[AP.Db] Unable to persist", key, err);
         return false;
@@ -61,6 +124,51 @@
     },
     remove(key) { try { localStorage.removeItem(key); } catch (_) {} }
   };
+
+  // Keep open customer pages in step with admin edits made by another browser.
+  // Session keys are deliberately local to each visitor.
+  let lastOrdersSnapshot = null;
+  let lastCustomersSnapshot = null;
+  if (sharedReady) {
+    window.setInterval(() => {
+      try {
+        const request = new XMLHttpRequest();
+        request.open("GET", "/api/state", false);
+        request.send();
+        if (request.status < 200 || request.status >= 300) return;
+        const latest = JSON.parse(request.responseText || "{}");
+        Object.keys(latest).forEach((key) => {
+          if (localOnlyKeys.has(key)) return;
+          const before = JSON.stringify(sharedState[key]);
+          const after = JSON.stringify(latest[key]);
+          if (before === after) return;
+          sharedState[key] = latest[key];
+          try { localStorage.setItem(key, after); } catch (_) {}
+          try { window.dispatchEvent(new CustomEvent("ap:data-change", { detail: { key } })); } catch (_) {}
+        });
+        const orderResponse = apiRequest("GET", "/api/orders");
+        if (orderResponse.ok && Array.isArray(orderResponse.orders)) {
+          const snapshot = JSON.stringify(orderResponse.orders);
+          if (lastOrdersSnapshot !== null && snapshot !== lastOrdersSnapshot) {
+            window.dispatchEvent(new CustomEvent("ap:orders-change"));
+          }
+          lastOrdersSnapshot = snapshot;
+        }
+        if (storage.get(KEYS.sessionAdmin, null)) {
+          const customerResponse = apiRequest("GET", "/api/admin/customers");
+          if (customerResponse.ok && Array.isArray(customerResponse.customers)) {
+            const snapshot = JSON.stringify(customerResponse.customers);
+            if (lastCustomersSnapshot !== null && snapshot !== lastCustomersSnapshot) {
+              storage.set(KEYS.customers, customerResponse.customers);
+              window.dispatchEvent(new CustomEvent("ap:customers-change"));
+              window.dispatchEvent(new CustomEvent("ap:data-change", { detail: { key: KEYS.customers } }));
+            }
+            lastCustomersSnapshot = snapshot;
+          }
+        }
+      } catch (_) { /* Retry on the next polling interval. */ }
+    }, 3000);
+  }
 
   function uid(prefix = "") {
     const rand = Math.random().toString(36).slice(2, 8);
@@ -165,6 +273,13 @@
 
   function seed() {
     if (storage.get(KEYS.seeded, false)) return;
+    const sharedStoreKeys = [KEYS.products, KEYS.categories, KEYS.promos, KEYS.settings];
+    if (sharedReady && sharedStoreKeys.some((key) => Object.prototype.hasOwnProperty.call(sharedState, key))) {
+      // A new browser must use the existing shared catalogue and settings,
+      // never replace them with starter content from this browser.
+      storage.set(KEYS.seeded, true);
+      return;
+    }
     storage.set(KEYS.categories, SEED_CATEGORIES);
     storage.set(KEYS.products, seedProducts());
     storage.set(KEYS.admin, [seedAdmin()]);
@@ -190,6 +305,7 @@
       whatsapp: "+234 800 000 0000",
       address: "Lagos, Nigeria",
       deliveryFee: 3500,
+      deliveryFees: {},
       freeDeliveryThreshold: 100000,
       currency: "NGN",
       announcement: "Welcome to Ankara Palace — Bringing African Fabric and Elegance to the World."
@@ -224,7 +340,17 @@
   /* ---------- Collections ---------- */
   const Collections = {
     customers: {
-      all: () => storage.get(KEYS.customers, []),
+      all: () => {
+        const local = storage.get(KEYS.customers, []);
+        if (sharedReady && storage.get(KEYS.sessionAdmin, null)) {
+          const response = apiRequest("GET", "/api/admin/customers");
+          if (response.ok && Array.isArray(response.customers)) {
+            storage.set(KEYS.customers, response.customers);
+            return response.customers;
+          }
+        }
+        return local;
+      },
       byId: (id) => Collections.customers.all().find((c) => c.id === id) || null,
       byEmail: (email) => Collections.customers.all().find((c) => (c.email || "").toLowerCase() === (email || "").toLowerCase()) || null,
       save: (list) => storage.set(KEYS.customers, list),
@@ -233,6 +359,17 @@
         const list = Collections.customers.all();
         const idx = list.findIndex((c) => c.id === id);
         if (idx === -1) return null;
+        if (sharedReady && storage.get(KEYS.sessionCustomer, null)?.id === id) {
+          const response = apiRequest("PUT", "/api/customer/profile", patch);
+          if (!response.ok || !response.customer) {
+            window.AP_LAST_PROFILE_ERROR = response.error || "Could not save your profile.";
+            return null;
+          }
+          list[idx] = { ...list[idx], ...response.customer };
+          storage.set(KEYS.customers, list);
+          window.AP_LAST_PROFILE_ERROR = "";
+          return list[idx];
+        }
         list[idx] = { ...list[idx], ...patch };
         Collections.customers.save(list);
         return list[idx];
@@ -271,13 +408,32 @@
       save: (list) => storage.set(KEYS.categories, list)
     },
     orders: {
-      all: () => storage.get(KEYS.orders, []),
+      all: () => {
+        if (sharedReady) {
+          const response = apiRequest("GET", "/api/orders");
+          if (response.ok && Array.isArray(response.orders)) return response.orders;
+          if (response.status === 401) return [];
+        }
+        return storage.get(KEYS.orders, []);
+      },
       byId: (id) => Collections.orders.all().find((o) => o.id === id) || null,
       byRef: (ref) => Collections.orders.all().find((o) => o.ref === ref) || null,
       byCustomer: (customerId) => Collections.orders.all().filter((o) => o.customerId === customerId),
-      save: (list) => storage.set(KEYS.orders, list),
-      add: (order) => { const list = Collections.orders.all(); list.push(order); Collections.orders.save(list); return order; },
+      save: (list) => { let ok = true; list.forEach((order) => { if (!Collections.orders.update(order.id, order)) ok = false; }); return ok; },
+      add: (order) => {
+        if (sharedReady) {
+          const response = apiRequest("POST", "/api/orders", order);
+          lastOrderError = response.ok ? "" : (response.error || "The order service could not save this order.");
+          return response.ok ? response.order : null;
+        }
+        const list = storage.get(KEYS.orders, []); list.push(order);
+        return storage.set(KEYS.orders, list) ? order : null;
+      },
       update: (id, patch) => {
+        if (sharedReady) {
+          const response = apiRequest("PUT", `/api/orders/${encodeURIComponent(id)}`, patch);
+          return response.ok ? response.order : null;
+        }
         const list = Collections.orders.all();
         const idx = list.findIndex((o) => o.id === id);
         if (idx === -1) return null;
@@ -361,7 +517,7 @@
       storage.set(KEYS.sessionCustomer, { id: customer.id, email: customer.email, name: customer.name, loggedInAt: nowISO() });
     },
     getCustomer() { return storage.get(KEYS.sessionCustomer, null); },
-    logoutCustomer() { storage.remove(KEYS.sessionCustomer); },
+    logoutCustomer() { if (sharedReady) apiRequest("POST", "/api/auth/logout"); storage.remove(KEYS.sessionCustomer); },
     loginAdmin(admin) {
       storage.set(KEYS.sessionAdmin, { id: admin.id, email: admin.email, name: admin.name, loggedInAt: nowISO() });
       Collections.logs.add({ action: "admin_login", email: admin.email });
@@ -370,6 +526,7 @@
     logoutAdmin() {
       const admin = Session.getAdmin();
       if (admin) Collections.logs.add({ action: "admin_logout", email: admin.email });
+      if (sharedReady) apiRequest("POST", "/api/admin/logout");
       storage.remove(KEYS.sessionAdmin);
     }
   };
@@ -383,7 +540,20 @@
 
   const Auth = {
     hashDemo,
-    registerCustomer({ name, email, phone, password }) {
+    sendVerificationCode(email, registration) {
+      return apiRequest("POST", "/api/auth/send-code", { email, ...(registration ? { registration } : {}) });
+    },
+    sendPasswordResetCode(email) {
+      return apiRequest("POST", "/api/auth/send-code", { email, purpose: "reset" });
+    },
+    registerCustomer({ name, email, phone, password, code }) {
+      if (sharedReady) {
+        const response = apiRequest("POST", "/api/auth/register", { email, code });
+        if (!response.ok) return { ok: false, error: response.error || "Could not create the account." };
+        Collections.customers.add(response.customer);
+        Session.loginCustomer(response.customer);
+        return { ok: true, customer: response.customer };
+      }
       if (Collections.customers.byEmail(email)) return { ok: false, error: "An account with this email already exists." };
       const customer = {
         id: uid("cust-"), name: name.trim(), email: email.trim().toLowerCase(),
@@ -394,20 +564,58 @@
       return { ok: true, customer };
     },
     loginCustomer(email, password) {
+      if (sharedReady) {
+        const response = apiRequest("POST", "/api/auth/login", { email, password });
+        if (!response.ok) return { ok: false, error: response.error || "Email or password is incorrect." };
+        Collections.customers.add(response.customer);
+        Session.loginCustomer(response.customer);
+        return { ok: true, customer: response.customer };
+      }
       const customer = Collections.customers.byEmail(email);
       if (!customer) return { ok: false, error: "No account found with this email." };
       if (customer.passwordHash !== hashDemo(password)) return { ok: false, error: "Incorrect password. Please try again." };
       Session.loginCustomer(customer);
       return { ok: true, customer };
     },
+    currentCustomer() {
+      if (!sharedReady) return Session.getCustomer();
+      const response = apiRequest("GET", "/api/auth/session");
+      if (!response.ok || !response.customer) return null;
+      Collections.customers.add(response.customer);
+      Session.loginCustomer(response.customer);
+      return response.customer;
+    },
     loginAdmin(email, password) {
+      // The server validates administrator credentials and issues an
+      // HttpOnly session cookie before this browser marks the session active.
+      if (sharedReady) {
+        try {
+          const request = new XMLHttpRequest();
+          request.open("POST", "/api/admin/login", false);
+          request.setRequestHeader("Content-Type", "application/json");
+          request.send(JSON.stringify({ email, password }));
+          if (request.status < 200 || request.status >= 300) {
+            const response = JSON.parse(request.responseText || "{}");
+            return { ok: false, error: response.error || "Invalid administrator credentials." };
+          }
+          const admin = Collections.admin.byEmail(email) || { id: "server-admin", email, name: "Ankara Palace Admin", role: "admin" };
+          Session.loginAdmin(admin);
+          return { ok: true, admin };
+        } catch (error) {
+          return { ok: false, error: "Could not reach the administrator sign-in service. Check that the site server is running." };
+        }
+      }
       const admin = Collections.admin.byEmail(email);
       if (!admin) return { ok: false, error: "Invalid administrator credentials." };
       if (admin.password !== password) return { ok: false, error: "Invalid administrator credentials." };
       Session.loginAdmin(admin);
       return { ok: true, admin };
     },
-    resetPassword(email, newPassword) {
+    resetPassword(email, newPassword, code) {
+      if (sharedReady) {
+        const response = apiRequest("POST", "/api/auth/reset-password", { email, password: newPassword, code });
+        return response.ok ? { ok: true } : { ok: false, error: response.error || "Could not reset your password." };
+      }
       const customer = Collections.customers.byEmail(email);
       if (!customer) return { ok: false, error: "No account found with this email." };
       Collections.customers.update(customer.id, { passwordHash: hashDemo(newPassword) });
@@ -427,8 +635,8 @@
     "Pending",
     "Awaiting Payment",
     "Accepted",
-    "Ready to Dispatch",
     "Shipped",
+    "Ready to Dispatch",
     "Delivered",
     "Rejected",
     "Cancelled"
@@ -437,13 +645,27 @@
   const ALLOWED_TRANSITIONS = {
     "Pending": ["Awaiting Payment", "Cancelled"],
     "Awaiting Payment": ["Accepted", "Cancelled"],
-    "Accepted": ["Ready to Dispatch", "Cancelled"],
-    "Ready to Dispatch": ["Shipped"],
-    "Shipped": ["Delivered"],
+    "Accepted": ["Shipped", "Cancelled"],
+    "Shipped": ["Ready to Dispatch"],
+    "Ready to Dispatch": ["Delivered"],
     "Delivered": [],
     "Rejected": [],
     "Cancelled": []
   };
+
+  const NIGERIAN_STATES = [
+    "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
+    "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "Gombe", "Imo",
+    "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos",
+    "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers",
+    "Sokoto", "Taraba", "Yobe", "Zamfara", "FCT"
+  ];
+
+  function deliveryStateKey(state) {
+    const value = String(state || "").trim().toLowerCase().replace(/\s+state$/i, "");
+    if (["abuja", "fct", "federal capital territory", "abuja (fct)"].includes(value)) return "FCT";
+    return NIGERIAN_STATES.find((entry) => entry.toLowerCase() === value) || String(state || "").trim();
+  }
 
   const OrderCalc = {
     calculate(items, options = {}) {
@@ -454,8 +676,13 @@
         return sum + qty * price;
       }, 0);
       const threshold = Number(settings.freeDeliveryThreshold) || 0;
-      const baseFee = Number(settings.deliveryFee) || 0;
-      const deliveryFee = subtotal >= threshold ? 0 : baseFee;
+      const baseFee = Math.max(0, Number(settings.deliveryFee) || 0);
+      const stateKey = deliveryStateKey(options.state);
+      const configuredFee = settings.deliveryFees && Object.prototype.hasOwnProperty.call(settings.deliveryFees, stateKey)
+        ? Number(settings.deliveryFees[stateKey])
+        : baseFee;
+      const stateFee = Number.isFinite(configuredFee) && configuredFee >= 0 ? configuredFee : baseFee;
+      const deliveryFee = subtotal >= threshold ? 0 : stateFee;
       let discount = 0;
       if (options.promo) {
         const promo = options.promo;
@@ -463,7 +690,7 @@
         else if (promo.type === "fixed") discount = Math.min(Number(promo.value) || 0, subtotal);
       }
       const total = Math.max(0, subtotal + deliveryFee - discount);
-      return { subtotal, deliveryFee, discount, total, freeDeliveryThreshold: threshold, itemCount: items.reduce((n, i) => n + (Number(i.quantity) || 0), 0) };
+      return { subtotal, deliveryFee, discount, total, freeDeliveryThreshold: threshold, deliveryState: stateKey, itemCount: items.reduce((n, i) => n + (Number(i.quantity) || 0), 0) };
     },
     allowedTransitions(status) { return ALLOWED_TRANSITIONS[status] || []; },
     canTransition(from, to) { return OrderCalc.allowedTransitions(from).includes(to); }
@@ -568,7 +795,9 @@
 
   window.AP = {
     KEYS, storage, uid, orderRef, nowISO, formatNaira, formatDate, formatDateTime,
-    Collections, Session, Auth, OrderCalc, ORDER_STATUSES, Address, Uploads,
+    Collections, Session, Auth, OrderCalc, ORDER_STATUSES, Address, Uploads, NIGERIAN_STATES, deliveryStateKey,
+    sharedConnected: () => sharedReady,
+    getLastOrderError: () => lastOrderError,
     trackVisit, seed
   };
 

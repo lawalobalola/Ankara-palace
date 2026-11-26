@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verify Email — Ankara Palace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="auth.css" />
+</head>
+<body>
+  <a href="#main" class="visually-hidden">Skip to main content</a>
+  <header id="site-header"></header>
+  <main id="main"><div class="auth-shell">
+    <aside class="auth-aside"><div class="auth-aside__inner"><div class="auth-aside__eyebrow">One last step</div><h2>Check your inbox</h2><p>Enter the six-digit code we sent to finish creating your account.</p></div></aside>
+    <section class="auth-main"><div class="auth-card">
+      <div class="auth-card__head"><h1>Verify Your Email</h1><p>We sent a code to <strong id="signup-verify-email"></strong></p></div>
+      <div id="signup-verify-alert" aria-live="polite"></div>
+      <form id="signup-verify-form" novalidate>
+        <div class="form-group"><label for="sv-code" class="form-label">6-digit verification code <span class="req">*</span></label><input type="text" id="sv-code" class="form-control" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="Enter your code" required /><div class="form-error"></div></div>
+        <button type="submit" class="btn btn--primary btn--lg w-full"><i class="fa-solid fa-shield-halved"></i> Verify and Create Account</button>
+      </form>
+      <div class="auth-note">Didn’t get the email? Check spam, or <button type="button" class="auth-link" id="signup-resend-code">send a new code</button>. Codes expire after 10 minutes.</div>
+      <div class="auth-footer"><a href="signup.html">← Back to create account</a></div>
+    </div></section>
+  </div></main>
+  <footer id="site-footer"></footer>
+  <script src="data.js"></script><script src="ui.js"></script><script src="nav.js"></script><script src="main.js"></script><script src="auth.js"></script>
+</body>
+</html>

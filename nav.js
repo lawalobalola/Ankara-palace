@@ -49,6 +49,7 @@
         <a href="customer-dashboard.html" class="btn btn--ghost btn--sm">
           <i class="fa-regular fa-user"></i> My Account
         </a>
+        <button type="button" class="btn btn--ghost btn--sm" data-ap-signout><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
       `
       : `
         ${cartLink}
@@ -87,7 +88,8 @@
           <a href="faq.html" ${isActive("faq.html")} data-ap-guest-only>FAQ</a>
           ${isLoggedIn
             ? `<a href="shop.html" class="btn btn--emerald">Shop</a>
-               <a href="customer-dashboard.html" class="btn btn--outline">My Account</a>`
+               <a href="customer-dashboard.html" class="btn btn--outline">My Account</a>
+               <button type="button" class="btn btn--ghost" data-ap-signout><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>`
             : `<a href="login.html" class="btn btn--ghost">Login</a>
                <a href="signup.html" class="btn btn--primary">Sign Up</a>`}
         </div>
@@ -98,6 +100,13 @@
     if (isLoggedIn) {
       mount.querySelectorAll("[data-ap-guest-only]").forEach((el) => el.remove());
     }
+
+    mount.querySelectorAll("[data-ap-signout]").forEach((button) => {
+      button.addEventListener("click", () => {
+        AP.Session.logoutCustomer();
+        window.location.href = "index.html";
+      });
+    });
 
     try {
       const count = (AP.storage.get("ap_cart", []) || []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
@@ -209,4 +218,8 @@
   } else {
     init();
   }
+
+  window.addEventListener("ap:data-change", (event) => {
+    if (event.detail?.key === AP.KEYS.settings) renderFooter();
+  });
 })();

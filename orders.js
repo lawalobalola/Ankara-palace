@@ -5,8 +5,8 @@
        hands off to all.js for the file picker + storage.
      - Uploaded receipt previews are shown to the customer.
      - Timeline uses the new status chain:
-       Pending → Awaiting Payment → Accepted → Ready to Dispatch
-       → Shipped → Delivered
+       Pending → Awaiting Payment → Accepted → Shipped
+       → Ready to Dispatch → Delivered
      - Delivery block renders LGA / Street / State / Country.
    ============================================================ */
 
@@ -19,8 +19,8 @@
     "Pending",
     "Awaiting Payment",
     "Accepted",
-    "Ready to Dispatch",
     "Shipped",
+    "Ready to Dispatch",
     "Delivered"
   ];
 
@@ -36,11 +36,17 @@
     return order;
   }
 
+  function isOrderSuccessful(order) {
+    return ["paid", "confirmed"].includes(String(order?.paymentStatus || "").toLowerCase())
+      || ["Accepted", "Order Success"].includes(order?.status);
+  }
+
   function renderBankPanel(order) {
     const settings = AP.Collections.settings.get();
     const receipts = Array.isArray(order.receipts) ? order.receipts : [];
     const hasReceipt = receipts.length > 0;
     const latest = hasReceipt ? receipts[receipts.length - 1] : null;
+    const orderSuccessful = isOrderSuccessful(order);
 
     const receiptBlock = hasReceipt
       ? `
@@ -73,9 +79,9 @@
         </p>
       `;
 
-    if (order.paymentStatus === "paid") {
+    if (orderSuccessful) {
       return `<div class="bank-panel"><h3><i class="fa-solid fa-circle-check"></i> Payment Confirmed</h3>
-        <p>Your transfer has been confirmed. Bank account details are hidden for this order.</p>
+        <p>Your order is successful. No further transfer is needed, and bank account details are hidden.</p>
         ${hasReceipt ? `<p class="color-muted">Receipt uploaded ${AP.formatDateTime(latest.uploadedAt)}.</p>` : ""}
         <p><strong>Order reference:</strong> ${escapeHtml(order.ref)}</p></div>`;
     }
@@ -169,11 +175,15 @@
       return;
     }
 
+    const orderSuccessful = isOrderSuccessful(order);
+
     root.innerHTML = `
       <div class="success-wrap">
         <div class="success-icon"><i class="fa-solid fa-check"></i></div>
-        <h1>Order Received</h1>
-        <p>Thank you for your order. Please complete your bank transfer using the details below.</p>
+        <h1>${orderSuccessful ? "Order Success" : "Order Received"}</h1>
+        <p>${orderSuccessful
+          ? "Your order has been approved. No further transfer is needed."
+          : "Thank you for your order. Please complete your bank transfer using the details below."}</p>
 
         <div class="success-ref">
           <span>Order Reference</span>
@@ -275,8 +285,8 @@
         </div>
         <div style="display:flex; gap:var(--sp-2); flex-wrap:wrap;">
           ${statusBadge(order.status)}
-          <span class="badge ${order.paymentStatus === "paid" ? "badge--success" : "badge--warning"}">
-            Payment: ${order.paymentStatus === "paid" ? "Confirmed" : "Pending"}
+          <span class="badge ${isOrderSuccessful(order) ? "badge--success" : "badge--warning"}">
+            Payment: ${isOrderSuccessful(order) ? "Confirmed" : "Pending"}
           </span>
         </div>
       </div>
@@ -326,7 +336,7 @@
             </div>
             <div class="detail-block" style="margin-top:var(--sp-3);">
               <h3>Status</h3>
-              <p>${order.paymentStatus === "paid" ? "Payment confirmed by Ankara Palace." : "Awaiting payment confirmation from Ankara Palace."}</p>
+              <p>${isOrderSuccessful(order) ? "Payment confirmed. No further transfer is needed." : "Awaiting payment confirmation from Ankara Palace."}</p>
             </div>
           </div>
         </div>
@@ -344,6 +354,10 @@
   function init() {
     if ($("#success-root")) renderSuccess();
     else if ($("#order-root")) renderDetails();
+    window.addEventListener("ap:orders-change", () => {
+      if ($("#success-root")) renderSuccess();
+      else if ($("#order-root")) renderDetails();
+    });
   }
 
   if (document.readyState === "loading") {
