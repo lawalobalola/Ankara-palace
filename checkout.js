@@ -5,10 +5,9 @@
        state, country, notes.
      - No second address, no postal code.
      - Uses AP.Address helpers for validation and formatting.
-     - Order status starts at "Pending"; payment status starts
-       as "unpaid" until admin confirms. The admin transition
-       chain (db.js) then moves the order to "Awaiting Payment"
-       → "Accepted" → "Ready to Dispatch" → "Shipped" → "Delivered".
+     - Order status starts at "Awaiting Payment". A receipt changes
+       it to "Pending" for review; admin approval marks it Accepted.
+       Tracking then moves Shipped → Ready to Dispatch → Delivered.
    ============================================================ */
 
 (function () {
@@ -192,7 +191,7 @@
               You will receive bank transfer instructions after placing your order.
             </p>
             <div class="bank-note" style="margin-top:var(--sp-3);">
-              <strong>Demo notice:</strong> This is a frontend prototype. No real payment or stock reservation occurs.
+              Your order is saved for store review. Bank transfer details and receipt steps appear after you place the order.
             </div>
           </div>
         </aside>
@@ -335,11 +334,11 @@
       totals,
       promoCode: promo ? promo.code : null,
       delivery,
-      status: "Pending",              // Required: order begins as Pending
+              status: "Awaiting Payment",
       paymentStatus: "unpaid",        // Until admin confirms → "Awaiting Payment"
       paymentMethod: "Bank Transfer",
       receipts: [],
-      statusHistory: [{ status: "Pending", at: AP.nowISO(), by: "customer" }],
+      statusHistory: [{ status: "Awaiting Payment", at: AP.nowISO(), by: "customer" }],
       createdAt: AP.nowISO(),
       updatedAt: AP.nowISO(),
       adminNotes: []
@@ -357,10 +356,14 @@
       return;
     }
 
-    requestedByProduct.forEach((quantity, productId) => {
-      const product = AP.Collections.products.byId(productId);
-      if (product) AP.Collections.products.update(product.id, { stock: Math.max(0, Number(product.stock) - quantity) });
-    });
+    // The shared server reserves stock atomically with the order save. Only
+    // the browser-only fallback needs to adjust stock here.
+    if (!AP.sharedConnected()) {
+      requestedByProduct.forEach((quantity, productId) => {
+        const product = AP.Collections.products.byId(productId);
+        if (product) AP.Collections.products.update(product.id, { stock: Math.max(0, Number(product.stock) - quantity) });
+      });
+    }
 
     AP.Collections.notifications.add({
       id: AP.uid("notif-"),

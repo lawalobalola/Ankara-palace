@@ -83,14 +83,14 @@
   /* Valid order statuses (requirement 6) */
   const ORDER_STATUSES = Object.freeze({
     AWAITING_PAYMENT:          "Awaiting Payment",
-    PAYMENT_PENDING:           "Payment Pending Verification",
-    PAYMENT_CONFIRMED:         "Payment Confirmed",
-    PROCESSING:                "Processing",
-    READY_FOR_DELIVERY:        "Ready for Delivery",
+    PAYMENT_PENDING:           "Pending",
+    PAYMENT_CONFIRMED:         "Accepted",
+    PROCESSING:                "Accepted",
+    READY_FOR_DELIVERY:        "Ready to Dispatch",
     SHIPPED:                   "Shipped",
     DELIVERED:                 "Delivered",
     CANCELLED:                 "Cancelled",
-    PAYMENT_REJECTED:          "Payment Rejected"
+    PAYMENT_REJECTED:          "Rejected"
   });
   const ORDER_STATUS_SET = new Set(Object.values(ORDER_STATUSES));
 

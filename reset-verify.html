@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Verify Reset Code — Ankara Palace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="auth.css" />
+</head>
+<body>
+  <a href="#main" class="visually-hidden">Skip to main content</a>
+  <header id="site-header"></header>
+  <main id="main"><div class="auth-shell">
+    <aside class="auth-aside"><div class="auth-aside__inner"><div class="auth-aside__eyebrow">Account Recovery · Step 2</div><h2>Check your inbox</h2><p>Enter the six-digit reset code sent to your email.</p></div></aside>
+    <section class="auth-main"><div class="auth-card">
+      <div class="auth-card__head"><h1>Verify Reset Code</h1><p>Code sent to <strong id="reset-verify-email"></strong></p></div>
+      <div id="reset-verify-alert" aria-live="polite"></div>
+      <form id="reset-verify-form" novalidate>
+        <div class="form-group"><label for="rv-code" class="form-label">6-digit code <span class="req">*</span></label><input type="text" id="rv-code" class="form-control" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="Enter your code" required /><div class="form-error"></div></div>
+        <button type="submit" class="btn btn--primary btn--lg w-full">Confirm Code</button>
+      </form>
+      <div class="auth-note">Didn’t receive it? <button type="button" class="auth-link" id="reset-resend-code">Resend code</button></div>
+      <div class="auth-footer"><a href="forget-password.html">← Back</a></div>
+    </div></section>
+  </div></main>
+  <footer id="site-footer"></footer>
+  <script src="data.js"></script><script src="ui.js"></script><script src="nav.js"></script><script src="main.js"></script><script src="auth.js"></script>
+</body>
+</html>

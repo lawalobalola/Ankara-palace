@@ -2,9 +2,9 @@
    ANKARA PALACE — CENTRAL DATA LAYER (MODIFIED)
    See previous delivery for the full rationale.
    Changes in this version:
-     - Order status flow aligned with customer journey:
-     Pending → Awaiting Payment → (payment confirmed)
-            → Accepted → Shipped → Ready to Dispatch → Delivered
+     - Order status flow aligned with payment review:
+       Awaiting Payment → Pending (receipt uploaded) → Accepted
+            → Shipped → Ready to Dispatch → Delivered
        Rejected / Cancelled are terminal.
      - AP.Address helpers for the simplified address model
        (Local Government Area, street, state, country).
@@ -37,8 +37,8 @@
     settings: "ap_settings"
   };
 
-  // Server data is the source of truth. Browser storage remains a cache and
-  // migration source so existing demo data is carried forward on first run.
+  // MongoDB-backed server state is the shared source of truth. Browser storage
+  // remains a cache and a migration source for a first-time admin catalogue sync.
   const sharedState = (() => {
     try {
       const request = new XMLHttpRequest();
@@ -66,8 +66,8 @@
       return { ok: false, status: 0, error: "The server is not available. Please try again." };
     }
   }
-  // Private account/order data and per-visitor activity stay on the visitor's
-  // browser until those flows are moved to their own authenticated endpoints.
+  // These keys are excluded from the public catalogue state endpoint. Customer
+  // and order changes use authenticated API routes; per-visitor UI data remains local.
   const localOnlyKeys = new Set([
     KEYS.sessionCustomer, KEYS.sessionAdmin, KEYS.customers, KEYS.admin,
     KEYS.orders, KEYS.notifications, KEYS.wishlist, KEYS.reviews, KEYS.cart,
@@ -272,7 +272,12 @@
   }
 
   function seed() {
-    if (storage.get(KEYS.seeded, false)) return;
+    if (storage.get(KEYS.seeded, false)) {
+      if (!storage.get(KEYS.products, []).length) storage.set(KEYS.products, seedProducts());
+      if (!storage.get(KEYS.categories, []).length) storage.set(KEYS.categories, SEED_CATEGORIES);
+      if (!storage.get(KEYS.admin, []).length) storage.set(KEYS.admin, [seedAdmin()]);
+      return;
+    }
     const sharedStoreKeys = [KEYS.products, KEYS.categories, KEYS.promos, KEYS.settings];
     if (sharedReady && sharedStoreKeys.some((key) => Object.prototype.hasOwnProperty.call(sharedState, key))) {
       // A new browser must use the existing shared catalogue and settings,
@@ -304,13 +309,38 @@
       storePhone: "+234 800 000 0000",
       whatsapp: "+234 800 000 0000",
       address: "Lagos, Nigeria",
-      deliveryFee: 3500,
+      deliveryFee: 0,
       deliveryFees: {},
-      freeDeliveryThreshold: 100000,
+      freeDeliveryThreshold: 0,
       currency: "NGN",
       announcement: "Welcome to Ankara Palace — Bringing African Fabric and Elegance to the World."
     });
     storage.set(KEYS.seeded, true);
+  }
+
+  function syncMissingSharedCatalog() {
+    if (!sharedReady) return false;
+    const defaults = [
+      [KEYS.categories, SEED_CATEGORIES],
+      [KEYS.products, seedProducts()],
+      [KEYS.promos, []],
+      [KEYS.settings, {}]
+    ];
+    let synced = true;
+    defaults.forEach(([key, fallback]) => {
+      const hasRemote = Object.prototype.hasOwnProperty.call(sharedState, key);
+      const remoteValue = sharedState[key];
+      const remoteEmpty = Array.isArray(remoteValue) ? remoteValue.length === 0 : remoteValue && typeof remoteValue === "object" ? Object.keys(remoteValue).length === 0 : false;
+      let cachedValue = null;
+      try {
+        const raw = localStorage.getItem(key);
+        if (raw !== null) cachedValue = JSON.parse(raw);
+      } catch (_) {}
+      const value = hasRemote && remoteEmpty && cachedValue !== null ? cachedValue : storage.get(key, fallback);
+      const localHasData = Array.isArray(value) ? value.length > 0 : value && typeof value === "object" ? Object.keys(value).length > 0 : false;
+      if ((!hasRemote || (remoteEmpty && localHasData)) && !storage.set(key, value)) synced = false;
+    });
+    return synced;
   }
 
   function repairSeedImages() {
@@ -517,7 +547,7 @@
       storage.set(KEYS.sessionCustomer, { id: customer.id, email: customer.email, name: customer.name, loggedInAt: nowISO() });
     },
     getCustomer() { return storage.get(KEYS.sessionCustomer, null); },
-    logoutCustomer() { if (sharedReady) apiRequest("POST", "/api/auth/logout"); storage.remove(KEYS.sessionCustomer); },
+    logoutCustomer() { apiRequest("POST", "/api/auth/logout"); storage.remove(KEYS.sessionCustomer); },
     loginAdmin(admin) {
       storage.set(KEYS.sessionAdmin, { id: admin.id, email: admin.email, name: admin.name, loggedInAt: nowISO() });
       Collections.logs.add({ action: "admin_login", email: admin.email });
@@ -543,8 +573,14 @@
     sendVerificationCode(email, registration) {
       return apiRequest("POST", "/api/auth/send-code", { email, ...(registration ? { registration } : {}) });
     },
+    verifyCustomerCode(email, code) {
+      return apiRequest("POST", "/api/auth/verify-code", { email, code });
+    },
     sendPasswordResetCode(email) {
       return apiRequest("POST", "/api/auth/send-code", { email, purpose: "reset" });
+    },
+    verifyPasswordResetCode(email, code) {
+      return apiRequest("POST", "/api/auth/verify-reset-code", { email, code });
     },
     registerCustomer({ name, email, phone, password, code }) {
       if (sharedReady) {
@@ -555,10 +591,13 @@
         return { ok: true, customer: response.customer };
       }
       if (Collections.customers.byEmail(email)) return { ok: false, error: "An account with this email already exists." };
+      const response = apiRequest("POST", "/api/auth/register", { email, code });
+      if (!response.ok) return { ok: false, error: response.error || "Could not create the account." };
       const customer = {
-        id: uid("cust-"), name: name.trim(), email: email.trim().toLowerCase(),
+        ...response.customer, name: name.trim(), email: email.trim().toLowerCase(),
         phone: phone.trim(), passwordHash: hashDemo(password),
-        avatarDataUrl: null, createdAt: nowISO()
+        avatarDataUrl: response.customer?.avatarDataUrl || null,
+        createdAt: response.customer?.createdAt || nowISO()
       };
       Collections.customers.add(customer);
       return { ok: true, customer };
@@ -572,15 +611,27 @@
         return { ok: true, customer: response.customer };
       }
       const customer = Collections.customers.byEmail(email);
-      if (!customer) return { ok: false, error: "No account found with this email." };
-      if (customer.passwordHash !== hashDemo(password)) return { ok: false, error: "Incorrect password. Please try again." };
-      Session.loginCustomer(customer);
-      return { ok: true, customer };
+      if (customer && customer.passwordHash === hashDemo(password)) {
+        Session.loginCustomer(customer);
+        return { ok: true, customer };
+      }
+      const response = apiRequest("POST", "/api/auth/login", { email, password });
+      if (!response.ok) return { ok: false, error: customer ? "Incorrect password. Please try again." : (response.error || "No account found with this email.") };
+      Collections.customers.add(response.customer);
+      Session.loginCustomer(response.customer);
+      return { ok: true, customer: response.customer };
     },
     currentCustomer() {
       if (!sharedReady) return Session.getCustomer();
       const response = apiRequest("GET", "/api/auth/session");
-      if (!response.ok || !response.customer) return null;
+      if (!response.ok) {
+        window.AP_SESSION_ERROR = response.error || "Could not verify your sign-in.";
+        if (response.status === 401) return null;
+        const saved = Session.getCustomer();
+        return saved ? (Collections.customers.byId(saved.id) || saved) : null;
+      }
+      if (!response.customer) return null;
+      window.AP_SESSION_ERROR = "";
       Collections.customers.add(response.customer);
       Session.loginCustomer(response.customer);
       return response.customer;
@@ -600,7 +651,8 @@
           }
           const admin = Collections.admin.byEmail(email) || { id: "server-admin", email, name: "Ankara Palace Admin", role: "admin" };
           Session.loginAdmin(admin);
-          return { ok: true, admin };
+          const catalogSynced = syncMissingSharedCatalog();
+          return { ok: true, admin, catalogSynced };
         } catch (error) {
           return { ok: false, error: "Could not reach the administrator sign-in service. Check that the site server is running." };
         }
@@ -616,6 +668,8 @@
         const response = apiRequest("POST", "/api/auth/reset-password", { email, password: newPassword, code });
         return response.ok ? { ok: true } : { ok: false, error: response.error || "Could not reset your password." };
       }
+      const remote = apiRequest("POST", "/api/auth/reset-password", { email, password: newPassword, code });
+      if (!remote.ok) return { ok: false, error: remote.error || "Could not reset your password." };
       const customer = Collections.customers.byEmail(email);
       if (!customer) return { ok: false, error: "No account found with this email." };
       Collections.customers.update(customer.id, { passwordHash: hashDemo(newPassword) });
@@ -624,16 +678,15 @@
   };
 
   /* ---------- Order statuses & transitions ----------
-     Required customer-facing flow:
-       Pending → Awaiting Payment → (payment confirmed)
-            → Accepted → (shipped) → Ready to Dispatch
-            → Shipped → Delivered
+   Customer-facing flow:
+       Awaiting Payment → Pending (receipt review) → Accepted
+            → Shipped → Ready to Dispatch → Delivered
      The admin-only transitions mirror this and prevent skipping steps.
      Rejected / Cancelled are terminal.
   ---------------------------------------------- */
   const ORDER_STATUSES = [
-    "Pending",
     "Awaiting Payment",
+    "Pending",
     "Accepted",
     "Shipped",
     "Ready to Dispatch",
@@ -643,8 +696,8 @@
   ];
 
   const ALLOWED_TRANSITIONS = {
-    "Pending": ["Awaiting Payment", "Cancelled"],
-    "Awaiting Payment": ["Accepted", "Cancelled"],
+    "Awaiting Payment": ["Pending", "Cancelled"],
+    "Pending": ["Cancelled"],
     "Accepted": ["Shipped", "Cancelled"],
     "Shipped": ["Ready to Dispatch"],
     "Ready to Dispatch": ["Delivered"],
@@ -676,13 +729,12 @@
         return sum + qty * price;
       }, 0);
       const threshold = Number(settings.freeDeliveryThreshold) || 0;
-      const baseFee = Math.max(0, Number(settings.deliveryFee) || 0);
       const stateKey = deliveryStateKey(options.state);
       const configuredFee = settings.deliveryFees && Object.prototype.hasOwnProperty.call(settings.deliveryFees, stateKey)
         ? Number(settings.deliveryFees[stateKey])
-        : baseFee;
-      const stateFee = Number.isFinite(configuredFee) && configuredFee >= 0 ? configuredFee : baseFee;
-      const deliveryFee = subtotal >= threshold ? 0 : stateFee;
+        : 0;
+      const stateFee = Number.isFinite(configuredFee) && configuredFee >= 0 ? configuredFee : 0;
+      const deliveryFee = stateFee;
       let discount = 0;
       if (options.promo) {
         const promo = options.promo;

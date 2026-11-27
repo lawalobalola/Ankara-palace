@@ -1,0 +1,15 @@
+{
+  "name": "ankara-palace-store",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ankara Palace e-commerce storefront and API",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "mongodb": "^6.22.0"
+  }
+}

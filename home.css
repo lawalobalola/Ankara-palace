@@ -352,6 +352,11 @@
 .promo-banner__visual img { width: 100%; height: 100%; object-fit: cover; }
 
 @media (max-width: 760px) {
+  .hero__inner { padding-inline: 4px; }
+  .hero__lead { font-size:1rem; line-height:1.65; }
+  .hero__stats { gap:12px; }
+  .hero__stat { min-width:0; }
+  .hero__stat strong { font-size:1rem; }
   .promo-banner { grid-template-columns: 1fr; padding: var(--sp-5); }
   .promo-banner__visual { display: none; }
 }

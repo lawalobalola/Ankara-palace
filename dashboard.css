@@ -102,6 +102,8 @@
   background: rgba(255,255,255,0.2);
   color: var(--white);
 }
+.dash-side__footer { margin-top: var(--sp-4); padding-top: var(--sp-3); border-top: 1px solid var(--border); }
+.dash-side__footer button { justify-content: flex-start; min-height: 46px; }
 
 .dash-main {
   min-height: 400px;

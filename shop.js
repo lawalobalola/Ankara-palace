@@ -19,7 +19,7 @@
     priceMin: null,
     priceMax: null,
     inStockOnly: false,
-    sort: "newest",
+    sort: "popular",
     page: 1,
     pageSize: 12
   };
@@ -30,6 +30,11 @@
     if (cat) state.categories.add(cat);
     const q = params.get("q");
     if (q) { state.search = q; const input = $("#shop-search"); if (input) input.value = q; }
+    const sort = params.get("sort");
+    if (["popular", "newest", "price-asc", "price-desc", "name-asc"].includes(sort)) {
+      state.sort = sort;
+      const select = $("#shop-sort"); if (select) select.value = sort;
+    }
   }
 
   function colourToCss(name) {
@@ -116,7 +121,8 @@
       case "price-desc": list.sort((a, b) => Number(b.pricePerYard) - Number(a.pricePerYard)); break;
       case "name-asc": list.sort((a, b) => a.name.localeCompare(b.name)); break;
       case "popular": list.sort((a, b) => (b.bestseller ? 1 : 0) - (a.bestseller ? 1 : 0)); break;
-      default: list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      case "newest": list.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)); break;
+      default: list.sort((a, b) => (Number(b.sales) || Number(b.orderCount) || Number(Boolean(b.bestseller))) - (Number(a.sales) || Number(a.orderCount) || Number(Boolean(a.bestseller))));
     }
     return list;
   }
@@ -151,7 +157,7 @@
     }
 
     if (countEl) countEl.innerHTML = `Showing <strong>${shown.length}</strong> of <strong>${total}</strong> fabric${total === 1 ? "" : "s"}`;
-    shown.forEach((p) => grid.appendChild(productCard(p, { showWishlist: true, quickAdd: true })));
+    shown.forEach((p) => grid.appendChild(productCard(p, { showWishlist: true, quickAdd: false })));
     if (loadWrap) loadWrap.hidden = shown.length >= total;
   }
 
@@ -185,11 +191,11 @@
     state.priceMin = null;
     state.priceMax = null;
     state.inStockOnly = false;
-    state.sort = "newest";
+    state.sort = "popular";
     state.page = 1;
 
     const s = $("#shop-search"); if (s) s.value = "";
-    const so = $("#shop-sort"); if (so) so.value = "newest";
+    const so = $("#shop-sort"); if (so) so.value = "popular";
     const pmin = $("#filter-price-min"); if (pmin) pmin.value = "";
     const pmax = $("#filter-price-max"); if (pmax) pmax.value = "";
     const stock = $("#filter-in-stock"); if (stock) stock.checked = false;
@@ -206,6 +212,11 @@
       // Show grid on focus/click even without typing
       search.addEventListener("focus", render);
       search.addEventListener("click", render);
+    }
+    const suggestions = $("#fabric-suggestions");
+    if (suggestions) {
+      const products = AP.Collections.products.active();
+      suggestions.innerHTML = products.map((p) => `<option value="${escapeHtml(p.name)}"></option>`).join("");
     }
     const sort = $("#shop-sort");
     if (sort) sort.addEventListener("change", (e) => { state.sort = e.target.value; state.page = 1; render(); });

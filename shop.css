@@ -33,7 +33,7 @@
 /* Layout */
 .shop-layout {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--sp-6);
   align-items: start;
   padding-block: var(--sp-7);

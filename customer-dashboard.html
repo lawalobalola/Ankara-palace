@@ -27,15 +27,15 @@
         <button type="button" class="btn btn--outline btn--sm dash-menu-toggle" id="dash-menu-toggle" aria-controls="dash-side" aria-expanded="false">
           <i class="fa-solid fa-bars" aria-hidden="true"></i> Account Menu
         </button>
-        <button type="button" class="btn btn--ghost btn--sm" id="logout-btn">
-          <i class="fa-solid fa-right-from-bracket"></i> Sign Out
-        </button>
       </div>
 
       <div class="dash-layout">
         <div class="dash-side-backdrop" id="dash-side-backdrop" hidden></div>
         <aside class="dash-side" id="dash-side" aria-label="Account sections">
           <nav class="dash-nav" id="dash-nav" aria-label="Account sections"></nav>
+          <div class="dash-side__footer">
+            <button type="button" class="btn btn--ghost btn--block" id="logout-btn"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
+          </div>
         </aside>
 
         <div class="dash-main" id="dash-main">
@@ -53,7 +53,6 @@
   <script src="main.js"></script>
   <script src="customer.js"></script>
   <script src="all.js"></script>
-  <script src="ap-customer-service.js"></script>
 </body>
 </html>
 

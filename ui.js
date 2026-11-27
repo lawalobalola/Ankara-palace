@@ -244,9 +244,9 @@
       document.dispatchEvent(new CustomEvent("ap:cart-updated", { detail: { count: items.reduce((sum, entry) => sum + (Number(entry.quantity) || 0), 0) } }));
     });
 
-    if (opts.showWishlist && AP.Session.getCustomer()) {
+    if (opts.showWishlist) {
       const customer = AP.Session.getCustomer();
-      const isWished = AP.Collections.wishlist.has(customer.id, product.id);
+      const isWished = Boolean(customer && AP.Collections.wishlist.has(customer.id, product.id));
       const wishBtn = document.createElement("button");
       wishBtn.type = "button";
       wishBtn.className = "product-card__wishlist btn btn--ghost btn--sm";
@@ -255,6 +255,10 @@
       wishBtn.title = isWished ? "Remove from wishlist" : "Save to wishlist";
       wishBtn.addEventListener("click", (e) => {
         e.preventDefault();
+        if (!customer) {
+          location.href = `login.html?redirect=${encodeURIComponent(location.pathname.split("/").pop() + location.search)}`;
+          return;
+        }
         const added = AP.Collections.wishlist.toggle(customer.id, product.id);
         wishBtn.querySelector("i").style.color = added ? "var(--terracotta)" : "inherit";
         wishBtn.setAttribute("aria-pressed", String(added));

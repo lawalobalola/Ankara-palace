@@ -1,11 +1,10 @@
 /* ============================================================
    ANKARA PALACE — ORDER SUCCESS & DETAILS (MODIFIED)
    Changes:
-     - Bank panel now shows an "I've sent the money" button that
-       hands off to all.js for the file picker + storage.
+     - Customers confirm a transfer before uploading its receipt.
      - Uploaded receipt previews are shown to the customer.
      - Timeline uses the new status chain:
-       Pending → Awaiting Payment → Accepted → Shipped
+       Awaiting Payment → Pending → Accepted → Shipped
        → Ready to Dispatch → Delivered
      - Delivery block renders LGA / Street / State / Country.
    ============================================================ */
@@ -16,8 +15,8 @@
   const { $, escapeHtml, statusBadge, toastSuccess, toastError } = UI;
 
   const FLOW = [
-    "Pending",
     "Awaiting Payment",
+    "Pending",
     "Accepted",
     "Shipped",
     "Ready to Dispatch",
@@ -68,14 +67,21 @@
             : ""}
         </div>
       `
-      : `
+      : order.transferReportedAt ? `
         <div style="margin-top:var(--sp-3); display:flex; gap:var(--sp-2); flex-wrap:wrap;">
           <button type="button" class="btn btn--emerald" data-ap-receipt-upload data-order-ref="${escapeHtml(order.ref)}">
-            <i class="fa-solid fa-receipt"></i> I've sent the money
+            <i class="fa-solid fa-upload"></i> Upload transfer receipt
+          </button>
+        </div>
+        <p class="color-muted" style="margin-top:8px; font-size:0.82rem;">Upload a clear photo or PDF so our team can verify your transfer.</p>
+      ` : `
+        <div style="margin-top:var(--sp-3); display:flex; gap:var(--sp-2); flex-wrap:wrap;">
+          <button type="button" class="btn btn--emerald" data-ap-transfer-confirm data-order-ref="${escapeHtml(order.ref)}">
+            <i class="fa-solid fa-check"></i> I've made the transfer
           </button>
         </div>
         <p class="color-muted" style="margin-top:8px; font-size:0.82rem;">
-          Upload a clear photo or PDF of your transfer receipt. Accepted: JPG, PNG, WEBP, PDF · Max 2 MB.
+          Copy the account details above, make your transfer, then confirm it here to upload your receipt.
         </p>
       `;
 
@@ -141,6 +147,20 @@
           () => toastSuccess("Copied to clipboard."),
           () => toastError("Unable to copy. Please copy manually.")
         );
+      });
+    });
+  }
+
+  function bindTransferButtons(root) {
+    root.querySelectorAll("[data-ap-transfer-confirm]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const ref = button.getAttribute("data-order-ref");
+        const order = AP.Collections.orders.byRef(ref);
+        if (!order || order.paymentStatus === "paid") return;
+        const updated = AP.Collections.orders.update(order.id, { transferReportedAt: AP.nowISO() });
+        if (!updated) { toastError("Could not save this step. Please try again."); return; }
+        toastSuccess("Thanks. Upload your transfer receipt to send it for review.");
+        if (root.id === "success-root") renderSuccess(); else renderDetails();
       });
     });
   }
@@ -228,6 +248,7 @@
     `;
 
     bindCopyButtons(root);
+    bindTransferButtons(root);
   }
 
   function renderDetails() {
@@ -349,6 +370,7 @@
     `;
 
     bindCopyButtons(root);
+    bindTransferButtons(root);
   }
 
   function init() {

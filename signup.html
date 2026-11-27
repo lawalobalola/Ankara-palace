@@ -42,8 +42,13 @@
 
           <form id="signup-form" novalidate>
             <div class="form-group">
-              <label for="su-name" class="form-label">Full Name <span class="req">*</span></label>
-              <input type="text" id="su-name" class="form-control" autocomplete="name" required />
+              <label for="su-first-name" class="form-label">First Name <span class="req">*</span></label>
+              <input type="text" id="su-first-name" class="form-control" autocomplete="given-name" required />
+              <div class="form-error"></div>
+            </div>
+            <div class="form-group">
+              <label for="su-last-name" class="form-label">Last Name <span class="req">*</span></label>
+              <input type="text" id="su-last-name" class="form-control" autocomplete="family-name" required />
               <div class="form-error"></div>
             </div>
 
@@ -55,7 +60,7 @@
 
             <div class="form-group">
               <label for="su-phone" class="form-label">Phone Number <span class="req">*</span></label>
-              <input type="tel" id="su-phone" class="form-control" autocomplete="tel" placeholder="+234 800 000 0000" required />
+              <div class="phone-input"><span aria-hidden="true">+234</span><input type="tel" id="su-phone" class="form-control" autocomplete="tel-national" inputmode="numeric" maxlength="11" placeholder="80123456789" aria-label="11 digit phone number" required /></div>
               <div class="form-error"></div>
             </div>
 
@@ -117,6 +122,5 @@
   <script src="auth.js"></script>
   <script src="live.js"></script>
   <script src="all.js"></script>
-  <script src="ap-customer-service.js"></script>
 </body>
 </html>

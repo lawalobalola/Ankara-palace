@@ -49,7 +49,6 @@
         <a href="customer-dashboard.html" class="btn btn--ghost btn--sm">
           <i class="fa-regular fa-user"></i> My Account
         </a>
-        <button type="button" class="btn btn--ghost btn--sm" data-ap-signout><i class="fa-solid fa-right-from-bracket"></i> Sign Out</button>
       `
       : `
         ${cartLink}
@@ -96,6 +95,19 @@
       </div>
     `;
 
+    // Move the drawer out of the header's backdrop-filter stacking context so
+    // it can cover the full mobile viewport reliably.
+    const mobileMenu = mount.querySelector("#mobile-menu");
+    if (mobileMenu) {
+      const backdrop = document.createElement("button");
+      backdrop.type = "button";
+      backdrop.className = "mobile-menu-backdrop";
+      backdrop.setAttribute("aria-label", "Close navigation menu");
+      backdrop.addEventListener("click", () => document.getElementById("nav-toggle")?.click());
+      document.body.appendChild(backdrop);
+      document.body.appendChild(mobileMenu);
+    }
+
     // Hide guest-only links when the customer is logged in.
     if (isLoggedIn) {
       mount.querySelectorAll("[data-ap-guest-only]").forEach((el) => el.remove());
@@ -121,11 +133,18 @@
     const toggle = document.getElementById("nav-toggle");
     const menu = document.getElementById("mobile-menu");
     if (toggle && menu) {
-      toggle.addEventListener("click", () => {
-        const open = menu.classList.toggle("is-open");
+      const setMenuOpen = (open) => {
+        menu.classList.toggle("is-open", open);
         toggle.setAttribute("aria-expanded", String(open));
+        toggle.setAttribute("aria-label", open ? "Close menu" : "Open menu");
         toggle.querySelector("i").className = open ? "fa-solid fa-xmark" : "fa-solid fa-bars";
+        document.body.classList.toggle("is-nav-open", open);
+      };
+      toggle.addEventListener("click", () => {
+        setMenuOpen(!menu.classList.contains("is-open"));
       });
+      menu.querySelectorAll("a, [data-ap-signout]").forEach((item) => item.addEventListener("click", () => setMenuOpen(false)));
+      document.addEventListener("keydown", (event) => { if (event.key === "Escape") setMenuOpen(false); });
     }
 
     const header = mount;
@@ -208,9 +227,31 @@
     `;
   }
 
+  function renderWhatsAppSupport() {
+    document.getElementById("whatsapp-support-link")?.remove();
+    const page = window.location.pathname.split("/").pop() || "index.html";
+    if (page.startsWith("admin")) return;
+    let number = String(AP.Collections.settings.get()?.whatsapp || "").replace(/\D/g, "");
+    if (number.startsWith("00")) number = number.slice(2);
+    if (number.startsWith("0")) number = `234${number.slice(1)}`;
+    else if (number.length === 10) number = `234${number}`;
+    if (number.length < 12 || number.length > 15 || number === "2348000000000") return;
+    const link = document.createElement("a");
+    link.id = "whatsapp-support-link";
+    link.className = "whatsapp-support-link";
+    link.href = `https://wa.me/${number}?text=${encodeURIComponent("Hello Ankara Palace, I need help with a fabric or order.")}`;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.setAttribute("aria-label", "Contact Ankara Palace customer service on WhatsApp");
+    link.title = "Customer service on WhatsApp";
+    link.innerHTML = '<i class="fa-brands fa-whatsapp" aria-hidden="true"></i><span>Customer Service</span>';
+    document.body.appendChild(link);
+  }
+
   function init() {
     renderHeader();
     renderFooter();
+    renderWhatsAppSupport();
   }
 
   if (document.readyState === "loading") {
@@ -220,6 +261,6 @@
   }
 
   window.addEventListener("ap:data-change", (event) => {
-    if (event.detail?.key === AP.KEYS.settings) renderFooter();
+    if (event.detail?.key === AP.KEYS.settings) { renderFooter(); renderWhatsAppSupport(); }
   });
 })();

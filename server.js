@@ -1,4 +1,4 @@
-/* Ankara Palace web server and shared JSON data store.
+/* Ankara Palace web server and MongoDB-backed shared data store.
    Run with: node server.js
    Set HOST=0.0.0.0 only when you intentionally want other devices on the
    same network to reach this development server. */
@@ -6,15 +6,20 @@
 const http = require("node:http");
 const fs = require("node:fs");
 const path = require("node:path");
+const { MongoClient } = require("mongodb");
 
 const ROOT = __dirname;
 const HOST = process.env.HOST || "127.0.0.1";
 const PORT = Number(process.env.PORT) || 4173;
 const DATA_DIR = path.join(ROOT, ".data");
 const DATA_FILE = path.join(DATA_DIR, "store.json");
+const MONGODB_URI = process.env.MONGODB_URI;
+const MONGODB_DB = process.env.MONGODB_DB || "ankara_palace";
 const MAX_BODY = 8 * 1024 * 1024;
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 let store = {};
+let stateCollection = null;
+let mongoClient = null;
 let writeQueue = Promise.resolve();
 const adminSessions = new Set();
 const customerSessions = new Map();
@@ -43,14 +48,72 @@ function json(response, status, value) {
 }
 
 function persist() {
-  const snapshot = JSON.stringify(store, null, 2);
-  writeQueue = writeQueue.then(async () => {
-    await fs.promises.mkdir(DATA_DIR, { recursive: true });
-    const tempFile = `${DATA_FILE}.tmp`;
-    await fs.promises.writeFile(tempFile, snapshot, "utf8");
-    await fs.promises.rename(tempFile, DATA_FILE);
+  const snapshot = JSON.parse(JSON.stringify(store));
+  const operations = [];
+  Object.entries(snapshot).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      const ids = value.map((item, index) => String(item?.id ?? item?.token ?? index));
+      operations.push({ replaceOne: {
+        filter: { _id: `meta:${key}` },
+        replacement: { _id: `meta:${key}`, kind: "array-meta", key, ids },
+        upsert: true
+      } });
+      value.forEach((item, index) => {
+        const id = ids[index];
+        operations.push({ replaceOne: {
+          filter: { _id: `entry:${key}:${encodeURIComponent(id)}` },
+          replacement: { _id: `entry:${key}:${encodeURIComponent(id)}`, kind: "array-entry", key, entryId: id, value: item },
+          upsert: true
+        } });
+      });
+      operations.push({ deleteMany: { filter: { kind: "array-entry", key, _id: { $nin: ids.map((id) => `entry:${key}:${encodeURIComponent(id)}`) } } } });
+      return;
+    }
+    operations.push({ replaceOne: {
+      filter: { _id: `value:${key}` },
+      replacement: { _id: `value:${key}`, kind: "state-value", key, value },
+      upsert: true
+    } });
   });
-  return writeQueue;
+  const task = writeQueue.then(async () => {
+    if (!stateCollection) throw new Error("MongoDB is not connected.");
+    if (operations.length) await stateCollection.bulkWrite(operations, { ordered: true });
+  });
+  writeQueue = task.catch(() => {});
+  return task;
+}
+
+async function loadStoreFromMongo() {
+  const records = await stateCollection.find({}).toArray();
+  store = {};
+  const entriesByKey = new Map();
+  records.forEach((record) => {
+    if (record.kind === "state-value") store[record.key] = record.value;
+    if (record.kind === "array-meta") store[record.key] = [];
+    if (record.kind === "array-entry") {
+      if (!entriesByKey.has(record.key)) entriesByKey.set(record.key, new Map());
+      entriesByKey.get(record.key).set(record.entryId, record.value);
+    }
+  });
+  records.filter((record) => record.kind === "array-meta").forEach((meta) => {
+    const entries = entriesByKey.get(meta.key) || new Map();
+    store[meta.key] = (meta.ids || []).map((id) => entries.get(id)).filter((entry) => entry !== undefined);
+  });
+}
+
+async function migrateLegacyJsonIfNeeded() {
+  if (await stateCollection.countDocuments() > 0) return false;
+  try {
+    const legacy = JSON.parse(await fs.promises.readFile(DATA_FILE, "utf8"));
+    store = legacy;
+    const importedGroups = Object.keys(legacy).length;
+    if (importedGroups) await persist();
+    console.log(`Imported ${importedGroups} legacy data groups into MongoDB.`);
+    return importedGroups > 0;
+  } catch (error) {
+    if (error.code !== "ENOENT") console.warn("Legacy JSON import skipped:", error.message);
+    return false;
+  }
 }
 
 function readJsonBody(request, response, callback) {
@@ -80,7 +143,8 @@ function getCustomerSession(request) {
 }
 
 function setSessionCookie(response, name, token) {
-  response.setHeader("Set-Cookie", `${name}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`);
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  response.setHeader("Set-Cookie", `${name}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}${secure}`);
 }
 
 function createAdminSession(response, email) {
@@ -176,6 +240,11 @@ const server = http.createServer((request, response) => {
     response.writeHead(400); response.end("Bad request"); return;
   }
 
+  if (pathname === "/api/health" && request.method === "GET") {
+    json(response, 200, { ok: true, storage: "mongodb", database: MONGODB_DB });
+    return;
+  }
+
   if (pathname === "/api/auth/send-code" && request.method === "POST") {
     readJsonBody(request, response, async (body) => {
       const email = String(body.email || "").trim().toLowerCase();
@@ -222,9 +291,11 @@ const server = http.createServer((request, response) => {
       pending.attempts += 1;
       if (pending.attempts > 5) {
         verificationCodes.delete(`signup:${email}`);
+        pendingRegistrations.delete(email);
         return json(response, 429, { error: "Too many incorrect codes. Request a new code." });
       }
       if (String(body.code || "").trim() !== pending.code) return json(response, 400, { error: "That verification code is incorrect." });
+      if (!pending.verified) return json(response, 400, { error: "Confirm the email code before creating this account." });
       if (byEmail(email)) return json(response, 409, { error: "An account with this email already exists." });
       const pendingRegistration = pendingRegistrations.get(email);
       if (!pendingRegistration) return json(response, 400, { error: "Your sign-up details expired. Please start again." });
@@ -241,8 +312,51 @@ const server = http.createServer((request, response) => {
     return;
   }
 
+  if (pathname === "/api/auth/verify-code" && request.method === "POST") {
+    readJsonBody(request, response, (body) => {
+      const email = String(body.email || "").trim().toLowerCase();
+      const codeKey = `signup:${email}`;
+      const pending = verificationCodes.get(codeKey);
+      if (!pending || pending.expiresAt < Date.now()) return json(response, 400, { error: "Request a new verification code and try again." });
+      pending.attempts += 1;
+      if (pending.attempts > 5) { verificationCodes.delete(codeKey); pendingRegistrations.delete(email); return json(response, 429, { error: "Too many incorrect codes. Request a new code." }); }
+      if (String(body.code || "").trim() !== pending.code) return json(response, 400, { error: "That verification code is incorrect." });
+      pending.verified = true;
+      return json(response, 200, { ok: true });
+    });
+    return;
+  }
+
   if (pathname === "/api/auth/reset-password" && request.method === "POST") {
     readJsonBody(request, response, async (body) => {
+      const email = String(body.email || "").trim().toLowerCase();
+      const codeKey = `reset:${email}`;
+      const pending = verificationCodes.get(codeKey);
+      if (!pending || pending.expiresAt < Date.now()) return json(response, 400, { error: "Request a new reset code and try again." });
+      if (!pending.verified || String(body.code || "").trim() !== pending.code) return json(response, 400, { error: "Verify your reset code before changing the password." });
+      const account = byEmail(email);
+      const password = String(body.password || "");
+      if (!account || password.length < 8) return json(response, 400, { error: "Enter a valid new password." });
+      const { salt, hash } = makePassword(password);
+      account.passwordSalt = salt;
+      account.passwordHash = hash;
+      for (const [token, session] of customerSessions) {
+        if (session.email === email) customerSessions.delete(token);
+      }
+      store.customerSessions = (store.customerSessions || []).filter((session) => session.email !== email);
+      verificationCodes.delete(codeKey);
+      try {
+        await persist();
+        response.setHeader("Set-Cookie", "ap_customer_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0");
+        json(response, 200, { ok: true });
+      }
+      catch (_) { json(response, 500, { error: "Could not reset the password. Please try again." }); }
+    });
+    return;
+  }
+
+  if (pathname === "/api/auth/verify-reset-code" && request.method === "POST") {
+    readJsonBody(request, response, (body) => {
       const email = String(body.email || "").trim().toLowerCase();
       const codeKey = `reset:${email}`;
       const pending = verificationCodes.get(codeKey);
@@ -250,15 +364,8 @@ const server = http.createServer((request, response) => {
       pending.attempts += 1;
       if (pending.attempts > 5) { verificationCodes.delete(codeKey); return json(response, 429, { error: "Too many incorrect codes. Request a new code." }); }
       if (String(body.code || "").trim() !== pending.code) return json(response, 400, { error: "That verification code is incorrect." });
-      const account = byEmail(email);
-      const password = String(body.password || "");
-      if (!account || password.length < 8) return json(response, 400, { error: "Enter a valid new password." });
-      const { salt, hash } = makePassword(password);
-      account.passwordSalt = salt;
-      account.passwordHash = hash;
-      verificationCodes.delete(codeKey);
-      try { await persist(); json(response, 200, { ok: true }); }
-      catch (_) { json(response, 500, { error: "Could not reset the password. Please try again." }); }
+      pending.verified = true;
+      return json(response, 200, { ok: true });
     });
     return;
   }
@@ -339,6 +446,9 @@ const server = http.createServer((request, response) => {
     if (!customer) return json(response, 401, { error: "Sign in before placing your order." });
     readJsonBody(request, response, async (body) => {
       const order = { ...body, customerId: customer.id, customerName: customer.name, customerEmail: customer.email, customerPhone: customer.phone };
+      if (!Array.isArray(store.ap_products) || store.ap_products.length === 0) {
+        return json(response, 503, { error: "The shared fabric catalogue is empty. Sign in to the admin dashboard to sync products before placing an order." });
+      }
       for (const item of order.items || []) {
         const product = (store.ap_products || []).find((entry) => entry.id === item.productId);
         if (!product) return json(response, 400, { error: "A fabric in this order is no longer available." });
@@ -370,14 +480,22 @@ const server = http.createServer((request, response) => {
         if (orders[index].customerId !== customer.id) return json(response, 403, { error: "You can only update your own order." });
         if (["paid", "confirmed"].includes(orders[index].paymentStatus)) return json(response, 409, { error: "Payment is already confirmed." });
         const now = new Date().toISOString();
-        orders[index] = {
-          ...orders[index],
-          receipts: Array.isArray(body.receipts) ? body.receipts.slice(-10) : orders[index].receipts,
-          paymentStatus: "receipt_submitted",
-          status: "Payment Pending Verification",
-          statusHistory: [...(orders[index].statusHistory || []), { status: "Payment Pending Verification", at: now, by: "customer", note: "Transfer receipt uploaded" }],
-          updatedAt: now
-        };
+        if (body.transferReportedAt && !Array.isArray(body.receipts)) {
+          if (orders[index].status !== "Awaiting Payment") return json(response, 409, { error: "This order is no longer waiting for a transfer." });
+          orders[index] = { ...orders[index], transferReportedAt: now, updatedAt: now };
+        } else {
+          if (!orders[index].transferReportedAt) return json(response, 409, { error: "Confirm your transfer before uploading its receipt." });
+          if (!Array.isArray(body.receipts) || body.receipts.length === 0) return json(response, 400, { error: "Upload a valid transfer receipt." });
+          if (!["Awaiting Payment", "Pending"].includes(orders[index].status)) return json(response, 409, { error: "A receipt cannot be uploaded for this order status." });
+          orders[index] = {
+            ...orders[index],
+            receipts: body.receipts.slice(-10),
+            paymentStatus: "receipt_submitted",
+            status: "Pending",
+            statusHistory: [...(orders[index].statusHistory || []), { status: "Pending", at: now, by: "customer", note: "Transfer receipt uploaded" }],
+            updatedAt: now
+          };
+        }
       } else {
         orders[index] = { ...orders[index], ...body, id: orders[index].id, updatedAt: new Date().toISOString() };
       }
@@ -496,13 +614,16 @@ const server = http.createServer((request, response) => {
 });
 
 async function start() {
-  try {
-    const raw = await fs.promises.readFile(DATA_FILE, "utf8");
-    store = JSON.parse(raw);
-  } catch (error) {
-    if (error.code !== "ENOENT") console.error("Could not load shared data store:", error);
-    store = {};
+  if (!MONGODB_URI) {
+    throw new Error("Set MONGODB_URI before starting the Ankara Palace server.");
   }
+  mongoClient = new MongoClient(MONGODB_URI, { serverSelectionTimeoutMS: 10000 });
+  await mongoClient.connect();
+  const database = mongoClient.db(MONGODB_DB);
+  await database.command({ ping: 1 });
+  stateCollection = database.collection("app_state");
+  await migrateLegacyJsonIfNeeded();
+  await loadStoreFromMongo();
   const now = Date.now();
   (store.customerSessions || []).forEach((session) => {
     if (session.token && session.expiresAt > now) {
@@ -515,11 +636,24 @@ async function start() {
     if (session.token && session.expiresAt > now) adminSessions.add(session.token);
   });
   store.adminSessions = (store.adminSessions || []).filter((session) => session.token && session.expiresAt > now);
+  await persist();
   server.listen(PORT, HOST, () => {
     console.log(`Ankara Palace: http://${HOST}:${PORT}/`);
-    console.log("Products, categories, promotions, and store settings are shared by connected browsers.");
+    console.log(`Connected to MongoDB database "${MONGODB_DB}".`);
+    console.log("Products, categories, customer accounts, orders, and store settings are stored in MongoDB.");
     console.log("Stop the server with Ctrl+C.");
   });
 }
 
-start();
+start().catch((error) => {
+  console.error("Ankara Palace could not start because MongoDB is unavailable or misconfigured:", error.message);
+  process.exitCode = 1;
+  mongoClient?.close().catch(() => {});
+});
+
+process.on("SIGINT", () => {
+  server.close(async () => {
+    await mongoClient?.close().catch(() => {});
+    process.exit(0);
+  });
+});

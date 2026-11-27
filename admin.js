@@ -604,7 +604,7 @@
       </div>
 
       <div style="margin-top:var(--sp-3); display:flex; gap:var(--sp-2); flex-wrap:wrap;">
-        ${order.status === "Awaiting Payment" && order.paymentStatus !== "paid"
+        ${order.status === "Pending" && order.paymentStatus === "receipt_submitted"
           ? `<button type="button" class="btn btn--emerald btn--sm" id="confirm-payment-btn"><i class="fa-solid fa-check"></i> Confirm Payment &amp; Accept</button>`
           : ""}
         ${transitions.map((t) => {
@@ -1083,14 +1083,12 @@
           <div class="form-group"><label class="form-label">Bank Name</label><input type="text" class="form-control" name="bankName" value="${escapeHtml(s.bankName || "")}" /></div>
           <div class="form-group"><label class="form-label">Account Name</label><input type="text" class="form-control" name="accountName" value="${escapeHtml(s.accountName || "")}" /></div>
           <div class="form-group"><label class="form-label">Account Number</label><input type="text" class="form-control" name="accountNumber" value="${escapeHtml(s.accountNumber || "")}" /></div>
-          <div class="form-group"><label class="form-label">Delivery Fee (₦)</label><input type="number" class="form-control" name="deliveryFee" min="0" value="${s.deliveryFee || 0}" /></div>
-          <div class="form-group"><label class="form-label">Free Delivery Threshold (₦)</label><input type="number" class="form-control" name="freeDeliveryThreshold" min="0" value="${s.freeDeliveryThreshold || 0}" /></div>
         </div>
         <button type="submit" class="btn btn--primary"><i class="fa-solid fa-floppy-disk"></i> Save Settings</button>
       </form>
       <section style="margin-top:var(--sp-6);padding-top:var(--sp-5);border-top:1px solid var(--border);">
         <h2>Delivery fees by state</h2>
-        <p class="color-muted">Set a fee for each state. States without a custom fee use the default delivery fee above.</p>
+        <p class="color-muted">Set the delivery fee for each state. States without a fee configured have no delivery charge.</p>
         <form id="delivery-rate-form" class="admin-form-grid" style="align-items:end;">
           <div class="form-group"><label class="form-label" for="delivery-state">State</label><select id="delivery-state" class="form-control" required>${AP.NIGERIAN_STATES.map((state) => `<option value="${escapeHtml(state)}">${state === "FCT" ? "Abuja (FCT)" : escapeHtml(state)}</option>`).join("")}</select></div>
           <div class="form-group"><label class="form-label" for="delivery-rate">Delivery fee (₦)</label><input id="delivery-rate" class="form-control" type="number" min="0" step="1" required /></div>
@@ -1109,7 +1107,7 @@
       const rows = Object.entries(rates).filter(([state, fee]) => AP.NIGERIAN_STATES.includes(state) && Number.isFinite(Number(fee)) && Number(fee) >= 0);
       card.querySelector("#delivery-rates-table").innerHTML = rows.length
         ? rows.sort(([a], [b]) => a.localeCompare(b)).map(([state, fee]) => `<tr><td>${state === "FCT" ? "Abuja (FCT)" : escapeHtml(state)}</td><td>${AP.formatNaira(Number(fee))}</td><td><button type="button" class="btn btn--ghost btn--sm" data-remove-delivery-state="${escapeHtml(state)}">Remove</button></td></tr>`).join("")
-        : `<tr><td colspan="3" class="color-muted">No state fees set. All states use the default fee.</td></tr>`;
+        : `<tr><td colspan="3" class="color-muted">No state fees configured yet.</td></tr>`;
     };
     renderRates();
     card.querySelector("#delivery-rate-form").addEventListener("submit", async (e) => {
@@ -1131,13 +1129,11 @@
       delete deliveryFees[state];
       if (!await AP.Collections.settings.save({ deliveryFees })) { toastError("The delivery fee could not be removed."); return; }
       renderRates();
-      toastSuccess("State fee removed. The default fee will apply.");
+      toastSuccess("State fee removed.");
     });
     card.querySelector("#settings-form").addEventListener("submit", (e) => {
       e.preventDefault();
       const data = Object.fromEntries(new FormData(e.target).entries());
-      data.deliveryFee = Number(data.deliveryFee) || 0;
-      data.freeDeliveryThreshold = Number(data.freeDeliveryThreshold) || 0;
       if (!AP.Collections.settings.save(data)) {
         toastError("Settings could not be saved. Browser storage may be full.");
         return;
